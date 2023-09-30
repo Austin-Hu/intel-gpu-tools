@@ -587,8 +587,12 @@ static struct bdb_block *find_section(const struct context *context, int section
 	    section_id != BDB_SDVO_LVDS_OPTIONS &&
 	    section_id != BDB_GENERAL_DEFINITIONS &&
 	    context->bdb->version >= 155)
-		fprintf(stderr, "Block %d min size %zu less than block size %zu\n",
+		printf("Block %d min size %zu less than block size %zu\n",
 			section_id, min_size, size);
+
+	if (min_size && size < min_size)
+		printf("Block %d size %zu less than block min size %zu\n",
+		       section_id, size, min_size);
 
 	block = calloc(1, sizeof(*block) + 3 + max(size, min_size));
 	if (!block) {
