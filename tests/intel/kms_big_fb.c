@@ -76,6 +76,12 @@
  *              and %arg[2]-rotation
  * Functionality: big_fbs, kms_gem_interop, rotation
  *
+ * SUBTEST: linear-max-hw-stride-%dbpp-rotate-%d-async-flip
+ * Description: Test maximum hardware supported stride length for given combination
+ *              of linear modifier with max hardware stride length, %arg[1]-bpp,
+ *              and %arg[2]-rotation
+ * Functionality: async_flips, big_fbs, kms_gem_interop, rotation
+ *
  * arg[1].values:       32, 64
  * arg[2].values:       0, 180
  */
@@ -925,6 +931,18 @@ static void test_cleanup(data_t *data)
 	data->output = NULL;
 }
 
+static bool has_async_flip(data_t *data)
+{
+	/*
+	 * TODO: preferably probe all this stuff with
+	 * TEST_ONLY rather than hardcoding it...
+	 */
+	if (data->modifier == DRM_FORMAT_MOD_LINEAR)
+		return false;
+
+	return igt_has_drm_cap(data->drm_fd, DRM_CAP_ASYNC_PAGE_FLIP);
+}
+
 static data_t data = {};
 
 static const struct {
@@ -1115,17 +1133,14 @@ igt_main
 						test_scanout(&data);
 					}
 
-					// async flip doesn't support linear fbs.
-					if (modifiers[i].modifier == DRM_FORMAT_MOD_LINEAR)
-						continue;
-
 					data.async_flip_test = true;
 					igt_describe("test async flip on maximum hardware supported stride length for given bpp and modifiers.");
-					igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%d%s-async-flip", modifiers[i].name,
-						formats[j].bpp, rotations[k].angle, fliptab[l].flipname) {
-							igt_require(igt_has_drm_cap(data.drm_fd, DRM_CAP_ASYNC_PAGE_FLIP));
-							data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
-							test_scanout(&data);
+					igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%d%s-async-flip",
+						      modifiers[i].name, formats[j].bpp,
+						      rotations[k].angle, fliptab[l].flipname) {
+						igt_require(has_async_flip(&data));
+						data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
+						test_scanout(&data);
 					}
 					data.async_flip_test = false;
 
