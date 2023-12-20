@@ -972,12 +972,12 @@ static const struct {
 
 static const struct {
 	uint32_t format;
-	uint8_t bpp;
+	const char *name;
 } formats[] = {
-	{ DRM_FORMAT_C8, 8, },
-	{ DRM_FORMAT_RGB565, 16, },
-	{ DRM_FORMAT_XRGB8888, 32, },
-	{ DRM_FORMAT_XBGR16161616F, 64, },
+	{ DRM_FORMAT_C8, "8bpp", },
+	{ DRM_FORMAT_RGB565, "16bpp", },
+	{ DRM_FORMAT_XRGB8888, "32bpp", },
+	{ DRM_FORMAT_XBGR16161616F, "64bpp", },
 };
 
 static const igt_rotation_t rotations[] = {
@@ -1100,8 +1100,8 @@ igt_main
 				igt_describe("Sanity check if scanout of big framebuffers works "
 					     "correctly for given combination of modifier formats "
 					     "and rotation");
-				igt_subtest_f("%s-%dbpp-rotate-%s%s", modifiers[i].name,
-					      formats[j].bpp,
+				igt_subtest_f("%s-%s-rotate-%s%s", modifiers[i].name,
+					      formats[j].name,
 					      igt_plane_rotation_name(data.rotation),
 					      rotation_flip_str(data.rotation))
 					test_scanout(&data);
@@ -1120,13 +1120,15 @@ igt_main
 		set_max_hw_stride(&data);
 
 		for (int j = 0; j < ARRAY_SIZE(formats); j++) {
+			int bpp = igt_drm_format_to_bpp(formats[j].format);
+
 			/*
 			 * try only those formats which can show full length.
 			 * Here 32K is used to have CI test results consistent
 			 * for all platforms, 32K is smallest number possbily
 			 * coming to data.hw_stride from above set_max_hw_stride()
 			 */
-			if (32768 / (formats[j].bpp >> 3) > 8192)
+			if (32768 / (bpp >> 3) > 8192)
 				continue;
 
 			data.format = formats[j].format;
@@ -1141,23 +1143,23 @@ igt_main
 					continue;
 
 				igt_describe("test maximum hardware supported stride length for given bpp and modifiers.");
-				igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%s%s",
-					      modifiers[i].name, formats[j].bpp,
+				igt_subtest_f("%s-max-hw-stride-%s-rotate-%s%s",
+					      modifiers[i].name, formats[j].name,
 					      igt_plane_rotation_name(data.rotation),
 					      rotation_flip_str(data.rotation)) {
 					igt_require(intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 5);
-					data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
+					data.max_hw_fb_width = min(data.hw_stride / (bpp >> 3), data.max_fb_width);
 					test_scanout(&data);
 				}
 
 				data.async_flip_test = true;
 				igt_describe("test async flip on maximum hardware supported stride length for given bpp and modifiers.");
-				igt_subtest_f("%s-max-hw-stride-%dbpp-rotate-%s%s-async-flip",
-					      modifiers[i].name, formats[j].bpp,
+				igt_subtest_f("%s-max-hw-stride-%s-rotate-%s%s-async-flip",
+					      modifiers[i].name, formats[j].name,
 					      igt_plane_rotation_name(data.rotation),
 					      rotation_flip_str(data.rotation)) {
 					igt_require(has_async_flip(&data));
-					data.max_hw_fb_width = min(data.hw_stride / (formats[j].bpp >> 3), data.max_fb_width);
+					data.max_hw_fb_width = min(data.hw_stride / (bpp >> 3), data.max_fb_width);
 					test_scanout(&data);
 				}
 				data.async_flip_test = false;
