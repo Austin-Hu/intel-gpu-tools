@@ -345,6 +345,21 @@ static void max_fb_size(data_t *data, int *width, int *height,
 	struct igt_fb fb;
 	int i = 0;
 
+	if (data->max_hw_stride_test) {
+		igt_output_t *output;
+
+		*width = data->max_hw_fb_width;
+		*height = 0;
+
+		for_each_connected_output(&data->display, output) {
+			if (*height < output->config.default_mode.vdisplay * 2)
+				*height = output->config.default_mode.vdisplay * 2;
+		}
+	} else {
+		*width = data->max_fb_width;
+		*height = data->max_fb_height;
+	}
+
 	/* max fence stride is only 8k bytes on gen3 */
 	if (intel_display_ver(data->devid) < 4 &&
 	    format == DRM_FORMAT_XRGB8888)
@@ -699,25 +714,10 @@ max_hw_stride_async_flip_test(data_t *data)
 
 static void test_scanout(data_t *data)
 {
-	igt_output_t *output;
-
 	igt_require(data->format == DRM_FORMAT_C8 ||
 		    igt_fb_supported_format(data->format));
 
 	igt_require(igt_display_has_format_mod(&data->display, data->format, data->modifier));
-
-	if (data->max_hw_stride_test) {
-		data->big_fb_width = data->max_hw_fb_width;
-		data->big_fb_height = 0;
-
-		for_each_connected_output(&data->display, output) {
-			if (data->big_fb_height < output->config.default_mode.vdisplay * 2)
-				data->big_fb_height = output->config.default_mode.vdisplay * 2;
-		}
-	} else {
-		data->big_fb_width = data->max_fb_width;
-		data->big_fb_height = data->max_fb_height;
-	}
 
 	max_fb_size(data, &data->big_fb_width, &data->big_fb_height,
 		    data->format, data->modifier);
@@ -851,6 +851,7 @@ test_addfb(data_t *data)
 	uint32_t fb_id;
 	uint32_t bo;
 	uint32_t format;
+	int width, height;
 	int ret;
 
 	/*
@@ -866,8 +867,9 @@ test_addfb(data_t *data)
 	igt_require(igt_display_has_format_mod(&data->display,
 					       format, data->modifier));
 
-	igt_init_fb(&fb, data->drm_fd,
-		    data->max_fb_width, data->max_fb_height,
+	max_fb_size(data, &width, &height, format, data->modifier);
+
+	igt_init_fb(&fb, data->drm_fd, width, height,
 		    format, data->modifier,
 		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 	igt_calc_fb_size(&fb);
@@ -885,8 +887,7 @@ test_addfb(data_t *data)
 			       igt_fb_mod_to_tiling(data->modifier), fb.strides[0]);
 
 	ret = __kms_addfb(data->drm_fd, bo,
-			  data->max_fb_width,
-			  data->max_fb_height,
+			  width, height,
 			  format, data->modifier,
 			  fb.strides, fb.offsets, fb.num_planes,
 			  DRM_MODE_FB_MODIFIERS, &fb_id);
