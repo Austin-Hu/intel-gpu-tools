@@ -74,6 +74,8 @@
  * @x-tiled:            TILE-X modifier
  * @y-tiled:            TILE-Y modifier
  * @yf-tiled:           TILE-YF modifier
+ * @y-tiled-ccs:        TILE-Y+CCS modifier
+ * @yf-tiled-ccs:       TILE-YF+CCS modifier
  *
  * arg[2].values:       8bpp, 16bpp, 32bpp, 64bpp, nv12, p016
  * arg[3].values:       0, 90, 180, 270
@@ -111,6 +113,8 @@
  * @x-tiled:            TILE-X modifier
  * @y-tiled:            TILE-Y modifier
  * @yf-tiled:           TILE-YF modifier
+ * @y-tiled-ccs:        TILE-Y+CCS modifier
+ * @yf-tiled-ccs:       TILE-YF+CCS modifier
  *
  * arg[2].values:       32, 64
  * arg[3].values:       0, 180
@@ -135,6 +139,8 @@
  * @x-tiled:            TILE-X modifier
  * @y-tiled:            TILE-Y modifier
  * @yf-tiled:           TILE-YF modifier
+ * @y-tiled-ccs:        TILE-Y+CCS modifier
+ * @yf-tiled-ccs:       TILE-YF+CCS modifier
  *
  * arg[2].values:       32, 64
  * arg[3].values:       0, 180
@@ -172,6 +178,8 @@
  * @x-tiled:    TILE-X
  * @y-tiled:    TILE-Y
  * @yf-tiled:   TILE-YF
+ * @y-tiled-ccs:        TILE-Y+CCS modifier
+ * @yf-tiled-ccs:       TILE-YF+CCS modifier
  */
 
 IGT_TEST_DESCRIPTION("Test big framebuffers");
@@ -373,7 +381,11 @@ static void max_fb_size(data_t *data, int *width, int *height,
 	struct igt_fb fb;
 	int i = 0;
 
-	if (data->max_hw_stride_test) {
+	if (igt_fb_is_ccs_modifier(data->modifier)) {
+		/* FIXME figure out what's correct */
+		*width = 8192;
+		*height = 8192;
+	} else if (data->max_hw_stride_test) {
 		igt_output_t *output;
 
 		*width = data->max_hw_fb_width;
@@ -967,6 +979,9 @@ static bool has_async_flip(data_t *data)
 	 * TODO: preferably probe all this stuff with
 	 * TEST_ONLY rather than hardcoding it...
 	 */
+	if (igt_fb_is_ccs_modifier(data->modifier))
+		return false;
+
 	if (igt_format_is_yuv_semiplanar(data->format))
 		return false;
 
@@ -988,6 +1003,8 @@ static const struct {
 	{ I915_FORMAT_MOD_Y_TILED, "y-tiled", },
 	{ I915_FORMAT_MOD_Yf_TILED, "yf-tiled", },
 	{ I915_FORMAT_MOD_4_TILED, "4-tiled", },
+	{ I915_FORMAT_MOD_Y_TILED_CCS, "y-tiled-ccs", },
+	{ I915_FORMAT_MOD_Yf_TILED_CCS, "yf-tiled-ccs", },
 };
 
 static const struct {
