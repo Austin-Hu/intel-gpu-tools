@@ -43,27 +43,27 @@
 #include "xe/xe_query.h"
 
 /**
- * SUBTEST: linear-%dbpp-rotate-%d
+ * SUBTEST: linear-%s-rotate-%d
  * Description: Sanity check if addfb ioctl works correctly for given combination
  *              of Linear modifier with %arg[1]-bpp & %arg[2]-rotation
  * Functionality: big_fbs, kms_gem_interop, rotation
  *
- * SUBTEST: linear-%dbpp-rotate-%d-hflip
+ * SUBTEST: linear-%s-rotate-%d-hflip
  * Description: Sanity check if addfb ioctl works correctly for given combination
  *              of Linear modifier with %arg[1]-bpp & %arg[2]-rotation
  * Functionality: big_fbs, kms_gem_interop, rotation
  *
- * arg[1].values:       8, 16, 32, 64
+ * arg[1].values:       8bpp, 16bpp, 32bpp, 64bpp, nv12, p016
  * arg[2].values:       0, 90, 180, 270
  */
 
 /**
- * SUBTEST: %s-%dbpp-rotate-%d
+ * SUBTEST: %s-%s-rotate-%d
  * Description: Sanity check if addfb ioctl works correctly for given combination
  *              of %arg[1] with %arg[2]-bpp & %arg[3]-rotation
  * Functionality: big_fbs, kms_gem_interop, rotation, tiling
  *
- * SUBTEST: %s-%dbpp-rotate-%d-hflip
+ * SUBTEST: %s-%s-rotate-%d-hflip
  * Description: Sanity check if addfb ioctl works correctly for given combination
  *              of %arg[1] with %arg[2]-bpp & %arg[3]-rotation
  * Functionality: big_fbs, kms_gem_interop, rotation, tiling
@@ -75,7 +75,7 @@
  * @y-tiled:            TILE-Y modifier
  * @yf-tiled:           TILE-YF modifier
  *
- * arg[2].values:       8, 16, 32, 64
+ * arg[2].values:       8bpp, 16bpp, 32bpp, 64bpp, nv12, p016
  * arg[3].values:       0, 90, 180, 270
  *
  * arg[4]:
@@ -238,6 +238,18 @@ static void copy_pattern(data_t *data,
 	 */
 	if (data->render_copy) {
 		data->render_copy(data->ibb, src, sx, sy, w, h, dst, dx, dy);
+
+		/* FIXME rendercopy should do this for us perhaps? */
+		if (igt_format_is_yuv_semiplanar(data->format)) {
+			igt_assert(!igt_fb_is_ccs_modifier(data->modifier));
+
+			src->bpp *= 2;
+			src->surface[0] = src->surface[1];
+			dst->bpp *= 2;
+			dst->surface[0] = dst->surface[1];
+
+			data->render_copy(data->ibb, src, sx/2, sy/2, w/2, h/2, dst, dx/2, dy/2);
+		}
 	} else {
 		w = min(w, src_fb->width - sx);
 		w = min(w, dst_fb->width - dx);
@@ -321,6 +333,10 @@ static void generate_pattern(data_t *data,
 				     pat_fb.width, pat_fb.height);
 			w++;
 			h++;
+			if (igt_format_is_yuv_semiplanar(data->format)) {
+				w++;
+				h++;
+			}
 		}
 	}
 
@@ -486,8 +502,9 @@ static bool test_plane(data_t *data)
 		y = coords[i].y;
 
 		/* Hardware limitation */
-		if (data->format == DRM_FORMAT_RGB565 &&
-		    igt_rotation_90_or_270(data->rotation)) {
+		if ((data->format == DRM_FORMAT_RGB565 &&
+		     igt_rotation_90_or_270(data->rotation)) ||
+		    igt_format_is_yuv_semiplanar(data->format)) {
 			x &= ~1;
 			y &= ~1;
 		}
@@ -950,6 +967,9 @@ static bool has_async_flip(data_t *data)
 	 * TODO: preferably probe all this stuff with
 	 * TEST_ONLY rather than hardcoding it...
 	 */
+	if (igt_format_is_yuv_semiplanar(data->format))
+		return false;
+
 	if (intel_display_ver(data->devid) < 12 &&
 	    data->modifier == DRM_FORMAT_MOD_LINEAR)
 		return false;
@@ -978,6 +998,8 @@ static const struct {
 	{ DRM_FORMAT_RGB565, "16bpp", },
 	{ DRM_FORMAT_XRGB8888, "32bpp", },
 	{ DRM_FORMAT_XBGR16161616F, "64bpp", },
+	{ DRM_FORMAT_NV12, "nv12", },
+	{ DRM_FORMAT_P016, "p016", },
 };
 
 static const igt_rotation_t rotations[] = {
