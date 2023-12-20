@@ -76,6 +76,8 @@
  * @yf-tiled:           TILE-YF modifier
  * @y-tiled-ccs:        TILE-Y+CCS modifier
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
+ * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
+ * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
  *
  * arg[2].values:       8bpp, 16bpp, 32bpp, 64bpp, nv12, p016
  * arg[3].values:       0, 90, 180, 270
@@ -115,6 +117,8 @@
  * @yf-tiled:           TILE-YF modifier
  * @y-tiled-ccs:        TILE-Y+CCS modifier
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
+ * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
+ * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
  *
  * arg[2].values:       32, 64
  * arg[3].values:       0, 180
@@ -141,6 +145,8 @@
  * @yf-tiled:           TILE-YF modifier
  * @y-tiled-ccs:        TILE-Y+CCS modifier
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
+ * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
+ * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
  *
  * arg[2].values:       32, 64
  * arg[3].values:       0, 180
@@ -180,6 +186,8 @@
  * @yf-tiled:   TILE-YF
  * @y-tiled-ccs:        TILE-Y+CCS modifier
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
+ * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
+ * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
  */
 
 IGT_TEST_DESCRIPTION("Test big framebuffers");
@@ -1005,6 +1013,8 @@ static const struct {
 	{ I915_FORMAT_MOD_4_TILED, "4-tiled", },
 	{ I915_FORMAT_MOD_Y_TILED_CCS, "y-tiled-ccs", },
 	{ I915_FORMAT_MOD_Yf_TILED_CCS, "yf-tiled-ccs", },
+	{ I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, "y-tiled-rc-ccs", },
+	{ I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC, "y-tiled-rc-ccs-cc", },
 };
 
 static const struct {
