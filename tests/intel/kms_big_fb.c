@@ -937,7 +937,8 @@ static bool has_async_flip(data_t *data)
 	 * TODO: preferably probe all this stuff with
 	 * TEST_ONLY rather than hardcoding it...
 	 */
-	if (data->modifier == DRM_FORMAT_MOD_LINEAR)
+	if (intel_display_ver(data->devid) < 12 &&
+	    data->modifier == DRM_FORMAT_MOD_LINEAR)
 		return false;
 
 	return igt_has_drm_cap(data->drm_fd, DRM_CAP_ASYNC_PAGE_FLIP);
