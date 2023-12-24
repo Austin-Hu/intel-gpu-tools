@@ -78,6 +78,8 @@
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
  * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
  * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
+ * @4-tiled-mtl-rc-ccs:     TILE-4+CCS modifier (MTL)
+ * @4-tiled-mtl-rc-ccs-cc:  TILE-4+CCS+CC modifier (MTL)
  *
  * arg[2].values:       8bpp, 16bpp, 32bpp, 64bpp, nv12, p016
  * arg[3].values:       0, 90, 180, 270
@@ -119,6 +121,8 @@
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
  * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
  * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
+ * @4-tiled-mtl-rc-ccs:     TILE-4+CCS modifier (MTL)
+ * @4-tiled-mtl-rc-ccs-cc:  TILE-4+CCS+CC modifier (MTL)
  *
  * arg[2].values:       32, 64
  * arg[3].values:       0, 180
@@ -147,6 +151,8 @@
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
  * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
  * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
+ * @4-tiled-mtl-rc-ccs:     TILE-4+CCS modifier (MTL)
+ * @4-tiled-mtl-rc-ccs-cc:  TILE-4+CCS+CC modifier (MTL)
  *
  * arg[2].values:       32, 64
  * arg[3].values:       0, 180
@@ -188,6 +194,8 @@
  * @yf-tiled-ccs:       TILE-YF+CCS modifier
  * @y-tiled-rc-ccs:     TILE-Y+CCS modifier
  * @y-tiled-rc-ccs-cc:  TILE-Y+CCS+CC modifier
+ * @4-tiled-mtl-rc-ccs:     TILE-4+CCS modifier (MTL)
+ * @4-tiled-mtl-rc-ccs-cc:  TILE-4+CCS+CC modifier (MTL)
  */
 
 IGT_TEST_DESCRIPTION("Test big framebuffers");
@@ -1015,6 +1023,8 @@ static const struct {
 	{ I915_FORMAT_MOD_Yf_TILED_CCS, "yf-tiled-ccs", },
 	{ I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS, "y-tiled-rc-ccs", },
 	{ I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS_CC, "y-tiled-rc-ccs-cc", },
+	{ I915_FORMAT_MOD_4_TILED_MTL_RC_CCS, "4-tiled-mtl-rc-ccs", },
+	{ I915_FORMAT_MOD_4_TILED_MTL_RC_CCS_CC, "4-tiled-mtl-rc-ccs-cc", },
 };
 
 static const struct {
