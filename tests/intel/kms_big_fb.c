@@ -389,7 +389,7 @@ static void max_fb_size(data_t *data, int *width, int *height,
 	struct igt_fb fb;
 	int i = 0;
 
-	if (igt_fb_is_ccs_modifier(data->modifier)) {
+	if (intel_display_ver(data->devid) < 13 && igt_fb_is_ccs_modifier(modifier)) {
 		/* FIXME figure out what's correct */
 		*width = 8192;
 		*height = 8192;
