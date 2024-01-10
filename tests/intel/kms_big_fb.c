@@ -366,56 +366,68 @@ static bool size_ok(data_t *data, uint64_t size)
 
 
 static void max_fb_size(data_t *data, int *width, int *height,
-			uint32_t format, uint64_t modifier)
+			uint32_t format, uint64_t modifier,
+			igt_rotation_t rotation)
 {
+	int max_width, max_height;
 	struct igt_fb fb;
 	int i = 0;
 
 	if (intel_display_ver(data->devid) < 13 && igt_fb_is_ccs_modifier(modifier)) {
 		/* FIXME figure out what's correct */
-		*width = 8192;
-		*height = 8192;
-	} else if (data->max_hw_stride_test) {
-		int cpp = igt_drm_format_to_bpp(format) / 8;
-		igt_output_t *output;
-
-		*width = data->max_fb_width;
-		*width = min(*width, data->max_hw_stride_pixels);
-		*width = min(*width, data->max_hw_stride_bytes / cpp);
-		*height = 0;
-
-		for_each_connected_output(&data->display, output) {
-			if (*height < output->config.default_mode.vdisplay * 2)
-				*height = output->config.default_mode.vdisplay * 2;
-		}
+		max_width = 8192;
+		max_height = 8192;
 	} else {
-		*width = data->max_fb_width;
-		*height = data->max_fb_height;
+		max_width = data->max_fb_width;
+		max_height = data->max_fb_height;
 	}
 
-	/* max fence stride is only 8k bytes on gen3 */
-	if (intel_display_ver(data->devid) < 4 &&
-	    format == DRM_FORMAT_XRGB8888)
-		*width = min(*width, 8192 / 4);
+	*width = max_width;
+	*height = max_height;
+
+	/*
+	 * max fence stride is only 8k bytes on gen3 vs. 4k max fb width,
+	 * and remapping isn't implemented currently on gen2/3.
+	 */
+	if (data->max_hw_stride_test || intel_display_ver(data->devid) < 4) {
+		int cpp = igt_drm_format_to_bpp(format) / 8;
+
+		if (igt_rotation_90_or_270(data->rotation)) {
+			*height = min(*height, data->max_hw_stride_pixels);
+			*height = min(*height, data->max_hw_stride_bytes / cpp);
+		} else {
+			*width = min(*width, data->max_hw_stride_pixels);
+			*width = min(*width, data->max_hw_stride_bytes / cpp);
+		}
+	}
 
 	igt_init_fb(&fb, data->drm_fd, *width, *height, format, modifier,
 		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 	igt_calc_fb_size(&fb);
 
 	while (!size_ok(data, fb.size)) {
-		if (i++ & 1)
-			*width >>= 1;
-		else
-			*height >>= 1;
+		if (data->max_hw_stride_test) {
+			/* try to keep the hw plane stride at the max */
+			if (igt_rotation_90_or_270(data->rotation))
+				*width >>= 1;
+			else
+				*height >>= 1;
+		} else {
+			/* try to maintain roughly square dimensions */
+			if (i++ & 1)
+				*width >>= 1;
+			else
+				*height >>= 1;
+		}
 
 		igt_init_fb(&fb, data->drm_fd, *width, *height, format, modifier,
 			    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 		igt_calc_fb_size(&fb);
 	}
 
-	igt_info("Max usable framebuffer size for format "IGT_FORMAT_FMT" / modifier 0x%"PRIx64": %dx%d\n",
+	igt_info("Max usable framebuffer size for format "IGT_FORMAT_FMT" / modifier 0x%"PRIx64": %dx%d (max reported %dx%d)\n",
 		 IGT_FORMAT_ARGS(format), modifier,
-		 *width, *height);
+		 *width, *height, max_width, max_height);
 }
 
 static void prep_small_fb(data_t *data, int width, int height)
@@ -730,7 +742,7 @@ static void test_scanout(data_t *data)
 	igt_require(igt_display_has_format_mod(&data->display, data->format, data->modifier));
 
 	max_fb_size(data, &data->big_fb_width, &data->big_fb_height,
-		    data->format, data->modifier);
+		    data->format, data->modifier, data->rotation);
 
 	for_each_pipe_with_valid_output(&data->display, data->pipe, data->output) {
 		igt_display_reset(&data->display);
@@ -872,7 +884,8 @@ test_addfb(data_t *data)
 	igt_require(igt_display_has_format_mod(&data->display,
 					       format, data->modifier));
 
-	max_fb_size(data, &width, &height, format, data->modifier);
+	max_fb_size(data, &width, &height, format, data->modifier,
+		    IGT_ROTATION_0);
 
 	igt_init_fb(&fb, data->drm_fd, width, height,
 		    format, data->modifier,
