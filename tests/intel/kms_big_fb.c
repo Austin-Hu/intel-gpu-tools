@@ -425,6 +425,11 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		igt_calc_fb_size(&fb);
 	}
 
+	igt_skip_on_f(data->max_hw_stride_test &&
+		      *width == max_width && *height == max_height,
+		      "Framebuffer size %dx%d already covered by normal test\n",
+		      *width, *height);
+
 	igt_info("Max usable framebuffer size for format "IGT_FORMAT_FMT" / modifier 0x%"PRIx64": %dx%d (max reported %dx%d)\n",
 		 IGT_FORMAT_ARGS(format), modifier,
 		 *width, *height, max_width, max_height);
