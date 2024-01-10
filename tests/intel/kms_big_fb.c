@@ -32,6 +32,7 @@
 
 #include "igt.h"
 #include <errno.h>
+#include <poll.h>
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
@@ -216,7 +217,7 @@ typedef struct {
 	igt_output_t *output;
 	igt_plane_t *plane;
 	igt_pipe_crc_t *pipe_crc;
-	struct igt_fb small_fb, big_fb, big_fb_flip[2];
+	struct igt_fb small_fb, big_fb, big_fb_solid;
 	uint32_t format;
 	uint64_t modifier;
 	int width, height;
@@ -231,7 +232,6 @@ typedef struct {
 	bool async_flip_test;
 	int max_hw_stride_pixels;
 	int max_hw_stride_bytes;
-	double planeclearrgb[3];
 } data_t;
 
 static struct intel_buf *init_buf(data_t *data,
@@ -299,53 +299,6 @@ static void copy_pattern(data_t *data,
 	/* intel_bb cache doesn't know when objects dissappear, so
 	 * let's purge the cache */
 	intel_bb_reset(data->ibb, true);
-}
-
-static void setup_fb(data_t *data, struct igt_fb *newfb, uint32_t width,
-		     uint32_t height, uint64_t format, uint64_t modifier, uint64_t stride)
-{
-	struct drm_mode_fb_cmd2 f = {0};
-	struct igt_fb col_fb;
-
-	newfb->strides[0] = stride;
-	igt_create_bo_for_fb(data->drm_fd, width, height, format, modifier,
-			     newfb);
-
-	igt_assert(newfb->gem_handle > 0);
-
-	f.width = newfb->width;
-	f.height = newfb->height;
-	f.pixel_format = newfb->drm_format;
-	f.flags = DRM_MODE_FB_MODIFIERS;
-
-	for (int n = 0; n < newfb->num_planes; n++) {
-		f.handles[n] = newfb->gem_handle;
-		f.modifier[n] = newfb->modifier;
-		f.pitches[n] = newfb->strides[n];
-		f.offsets[n] = newfb->offsets[n];
-	}
-
-	if (data->planeclearrgb[0] != 0.0 || data->planeclearrgb[1] != 0.0 ||
-	    data->planeclearrgb[2] != 0.0) {
-		igt_create_color_fb(data->drm_fd, 512, 512,
-				    newfb->drm_format, newfb->modifier,
-				    data->planeclearrgb[0],
-				    data->planeclearrgb[1],
-				    data->planeclearrgb[2],
-				    &col_fb);
-
-		for (int y = 0; y < newfb->height; y += 512) {
-			for (int x = 0; x < newfb->width; x += 512) {
-				copy_pattern(data, newfb, x, y,
-					&col_fb, 0, 0,
-					512, 512);
-			}
-		}
-		igt_remove_fb(data->drm_fd, &col_fb);
-	}
-
-	igt_assert(drmIoctl(data->drm_fd, DRM_IOCTL_MODE_ADDFB2, &f) == 0);
-	newfb->fb_id = f.fb_id;
 }
 
 static void generate_pattern(data_t *data,
@@ -469,19 +422,21 @@ static void prep_big_fb(data_t *data)
 	if (data->big_fb.fb_id)
 		return;
 
-	if (!data->max_hw_stride_test) {
+	if (!data->big_fb.fb_id) {
 		igt_create_fb(data->drm_fd,
-			data->big_fb_width, data->big_fb_height,
-			data->format, data->modifier,
-			&data->big_fb);
-	} else {
-		setup_fb(data, &data->big_fb, data->big_fb_width,
-			 data->big_fb_height, data->format, data->modifier,
-			 data->max_hw_stride_bytes);
-		igt_debug("using stride length %d\n", data->max_hw_stride_bytes);
+			      data->big_fb_width, data->big_fb_height,
+			      data->format, data->modifier,
+			      &data->big_fb);
+		generate_pattern(data, &data->big_fb, 640, 480);
 	}
 
-	generate_pattern(data, &data->big_fb, 640, 480);
+	if (data->async_flip_test && !data->big_fb_solid.fb_id) {
+		igt_create_color_fb(data->drm_fd,
+				    data->big_fb_width, data->big_fb_height,
+				    data->format, data->modifier,
+				    0.0, 1.0, 0.0,
+				    &data->big_fb_solid);
+	}
 }
 
 static void set_c8_lut(data_t *data)
@@ -512,11 +467,60 @@ static void unset_lut(data_t *data)
 	igt_pipe_obj_replace_prop_blob(pipe, IGT_CRTC_GAMMA_LUT, NULL, 0);
 }
 
+static void wait_flip_event(data_t *data)
+{
+	drmEventContext evctx = {
+		.version = 2,
+	};
+	struct pollfd pfd = {
+		.fd = data->drm_fd,
+		.events = POLLIN,
+	};
+	int ret;
+
+	ret = poll(&pfd, 1, -1);
+	igt_assert_eq(ret, 1);
+
+	ret = drmHandleEvent(data->drm_fd, &evctx);
+	igt_assert_eq(ret, 0);
+}
+
+static unsigned int mode_frame_time(const drmModeModeInfo *mode)
+{
+	return 1000ULL * mode->htotal * mode->vtotal / mode->clock;
+}
+
+static void do_async_flip(data_t *data)
+{
+	const drmModeModeInfo *mode = igt_output_get_mode(data->output);
+	int ret;
+
+	/* first async flip maybe be turned into a sync flip, keep the solid fb */
+	ret = drmModePageFlip(data->drm_fd, data->output->config.crtc->crtc_id,
+			      data->big_fb_solid.fb_id,
+			      DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, data);
+	igt_assert_eq(ret, 0);
+	wait_flip_event(data);
+
+	/* try to make sure we see the tear, for a bit of visual feedback only */
+	igt_wait_for_vblank(data->drm_fd, data->pipe);
+	usleep(mode_frame_time(mode) * (mode->vtotal - mode->vdisplay * 2 / 3) / mode->vtotal);
+
+	/* first guaranteed real async flip, now change to the patterned fb */
+	ret = drmModePageFlip(data->drm_fd, data->output->config.crtc->crtc_id,
+			      data->big_fb.fb_id,
+			      DRM_MODE_PAGE_FLIP_ASYNC | DRM_MODE_PAGE_FLIP_EVENT, data);
+	igt_assert_eq(ret, 0);
+	wait_flip_event(data);
+
+	/* next frame should have the correct crc */
+	igt_wait_for_vblank(data->drm_fd, data->pipe);
+}
+
 static bool test_plane(data_t *data)
 {
 	igt_plane_t *plane = data->plane;
 	struct igt_fb *small_fb = &data->small_fb;
-	struct igt_fb *big_fb = &data->big_fb;
 	int w = data->big_fb_width - small_fb->width;
 	int h = data->big_fb_height - small_fb->height;
 	bool run_in_simulation = igt_run_in_simulation();
@@ -544,6 +548,7 @@ static bool test_plane(data_t *data)
 
 	for (int i = 0; i < ARRAY_SIZE(coords); i++) {
 		igt_crc_t small_crc, big_crc;
+		struct igt_fb *big_fb;
 		int x, y;
 
 		if (run_in_simulation)
@@ -591,7 +596,7 @@ static bool test_plane(data_t *data)
 		 * rendering pipeline introduces slight differences into
 		 * the result if we try that, and so the crc will not match.
 		 */
-		copy_pattern(data, small_fb, 0, 0, big_fb, x, y,
+		copy_pattern(data, small_fb, 0, 0, &data->big_fb, x, y,
 			     small_fb->width, small_fb->height);
 
 		igt_display_commit2(&data->display, data->display.is_atomic ?
@@ -599,12 +604,20 @@ static bool test_plane(data_t *data)
 		igt_pipe_crc_start(data->pipe_crc);
 		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &small_crc);
 
+		if (data->async_flip_test)
+			big_fb = &data->big_fb_solid;
+		else
+			big_fb = &data->big_fb;
+
 		igt_plane_set_fb(plane, big_fb);
 		igt_fb_set_position(big_fb, plane, x, y);
 		igt_fb_set_size(big_fb, plane, small_fb->width, small_fb->height);
 		igt_plane_set_size(plane, data->width, data->height);
 		igt_display_commit2(&data->display, data->display.is_atomic ?
 				    COMMIT_ATOMIC : COMMIT_UNIVERSAL);
+
+		if (data->async_flip_test)
+			do_async_flip(data);
 
 		igt_pipe_crc_get_current(data->display.drm_fd, data->pipe_crc, &big_crc);
 
@@ -692,105 +705,6 @@ static bool test_pipe(data_t *data)
 	return ret;
 }
 
-static bool
-max_hw_stride_async_flip_test(data_t *data)
-{
-	uint32_t ret;
-	const uint32_t w = data->output->config.default_mode.hdisplay,
-		       h = data->output->config.default_mode.vdisplay;
-	igt_plane_t *primary;
-	igt_crc_t compare_crc, async_crc;
-
-	igt_require(data->display.is_atomic);
-
-	igt_info("Using (pipe %s + %s) to run the subtest.\n",
-		 kmstest_pipe_name(data->pipe), igt_output_name(data->output));
-
-	igt_output_set_pipe(data->output, data->pipe);
-
-	primary = igt_output_get_plane_type(data->output, DRM_PLANE_TYPE_PRIMARY);
-
-	if (!igt_plane_has_format_mod(primary, data->format, data->modifier))
-		return false;
-
-	if (!igt_plane_has_rotation(primary, data->rotation))
-		return false;
-
-	igt_plane_set_rotation(primary, data->rotation);
-
-	igt_require_f(igt_display_try_commit2(&data->display, COMMIT_ATOMIC) == 0,
-		      "rotation/flip not supported\n");
-
-	data->ibb = intel_bb_create(data->drm_fd, 4096);
-
-	setup_fb(data, &data->big_fb, data->big_fb_width, data->big_fb_height,
-		 data->format, data->modifier, data->max_hw_stride_bytes);
-	generate_pattern(data, &data->big_fb, 640, 480);
-
-	data->planeclearrgb[1] = 1.0;
-
-	setup_fb(data, &data->big_fb_flip[0], data->big_fb_width,
-		 data->big_fb_height, data->format, data->modifier,
-		 data->max_hw_stride_bytes);
-
-	data->planeclearrgb[1] = 0.0;
-
-	setup_fb(data, &data->big_fb_flip[1], data->big_fb_width,
-		 data->big_fb_height, data->format, data->modifier,
-		 data->max_hw_stride_bytes);
-	generate_pattern(data, &data->big_fb_flip[1], 640, 480);
-
-	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
-					  IGT_PIPE_CRC_SOURCE_AUTO);
-	igt_pipe_crc_start(data->pipe_crc);
-
-	igt_plane_set_fb(primary, &data->big_fb);
-	igt_fb_set_size(&data->big_fb, primary, w, h);
-	igt_plane_set_size(primary, w, h);
-	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET, NULL);
-	igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &compare_crc);
-
-	igt_set_timeout(5, "Async pageflipping loop got stuck!\n");
-	for (int i = 0; i < 2; i++) {
-		/* First async flip on Gen13+ will be treated as a sync flip*/
-		if (intel_display_ver(data->devid) >= 13) {
-			do {
-				ret = drmModePageFlip(data->drm_fd, data->output->config.crtc->crtc_id,
-						      data->big_fb.fb_id,
-						      DRM_MODE_PAGE_FLIP_ASYNC, NULL);
-			} while (ret == -EBUSY);
-			igt_assert(ret == 0);
-		}
-
-		for (int j = 0; j < 2; j++) {
-			do {
-				ret = drmModePageFlip(data->drm_fd, data->output->config.crtc->crtc_id,
-						      data->big_fb_flip[i].fb_id,
-						      DRM_MODE_PAGE_FLIP_ASYNC, NULL);
-			} while (ret == -EBUSY);
-			igt_assert(ret == 0);
-
-			do {
-				ret = drmModePageFlip(data->drm_fd, data->output->config.crtc->crtc_id,
-						      data->big_fb.fb_id,
-						      DRM_MODE_PAGE_FLIP_ASYNC, NULL);
-			} while (ret == -EBUSY);
-			igt_assert(ret == 0);
-		}
-
-		igt_pipe_crc_get_current(data->drm_fd, data->pipe_crc, &async_crc);
-
-		igt_assert_f(igt_check_crc_equal(&compare_crc, &async_crc)^(i^1),
-			     "CRC failure with async flip, crc %s match for checked round\n",
-			     i?"should":"shouldn't");
-	}
-	igt_reset_timeout();
-
-	intel_bb_destroy(data->ibb);
-
-	return true;
-}
-
 static void test_scanout(data_t *data)
 {
 	igt_require(data->format == DRM_FORMAT_C8 ||
@@ -808,13 +722,8 @@ static void test_scanout(data_t *data)
 		if (!intel_pipe_output_combo_valid(&data->display))
 			continue;
 
-		if (data->async_flip_test) {
-			if (max_hw_stride_async_flip_test(data))
-				return;
-		} else {
-			if (test_pipe(data))
-				return;
-		}
+		if (test_pipe(data))
+			return;
 		break;
 	}
 
@@ -1005,9 +914,8 @@ static void test_cleanup(data_t *data)
 
 	igt_pipe_crc_free(data->pipe_crc);
 	igt_output_set_pipe(data->output, PIPE_NONE);
+	igt_remove_fb(data->drm_fd, &data->big_fb_solid);
 	igt_remove_fb(data->drm_fd, &data->big_fb);
-	igt_remove_fb(data->drm_fd, &data->big_fb_flip[0]);
-	igt_remove_fb(data->drm_fd, &data->big_fb_flip[1]);
 	igt_remove_fb(data->drm_fd, &data->small_fb);
 
 	data->output = NULL;
@@ -1132,13 +1040,6 @@ igt_main
 			data.render_copy = igt_get_render_copyfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
-
-		data.planeclearrgb[0] = 0.0;
-		data.planeclearrgb[1] = 0.0;
-		data.planeclearrgb[2] = 0.0;
-
-		data.max_hw_stride_test = false;
-		data.async_flip_test = false;
 	}
 
 	/*
@@ -1185,11 +1086,24 @@ igt_main
 				igt_describe("Sanity check if scanout of big framebuffers works "
 					     "correctly for given combination of modifier formats "
 					     "and rotation");
-				igt_subtest_f("%s-%s-rotate-%s%s", modifiers[i].name,
-					      formats[j].name,
+				igt_subtest_f("%s-%s-rotate-%s%s",
+					      modifiers[i].name, formats[j].name,
 					      igt_plane_rotation_name(data.rotation),
 					      rotation_flip_str(data.rotation))
 					test_scanout(&data);
+
+				data.async_flip_test = true;
+				igt_describe("Sanity check if scanout of big framebuffers works "
+					     "correctly for given combination of modifier formats "
+					     "and rotation, using async flips");
+				igt_subtest_f("%s-%s-rotate-%s%s-async-flip",
+					      modifiers[i].name, formats[j].name,
+					      igt_plane_rotation_name(data.rotation),
+					      rotation_flip_str(data.rotation)) {
+					igt_require(has_async_flip(&data));
+					test_scanout(&data);
+				}
+				data.async_flip_test = false;
 			}
 
 			igt_fixture
@@ -1198,36 +1112,18 @@ igt_main
 	}
 
 	data.max_hw_stride_test = true;
-	// Run max hw stride length tests on gen5 and later.
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		data.modifier = modifiers[i].modifier;
 
 		set_max_hw_stride(&data);
 
 		for (int j = 0; j < ARRAY_SIZE(formats); j++) {
-			int bpp = igt_drm_format_to_bpp(formats[j].format);
-
-			/*
-			 * try only those formats which can show full length.
-			 * Here 32K is used to have CI test results consistent
-			 * for all platforms, 32K is smallest number possbily
-			 * coming to data.hw_stride from above set_max_hw_stride()
-			 */
-			if (32768 / (bpp >> 3) > 8192)
-				continue;
-
 			data.format = formats[j].format;
 
 			for (int k = 0; k < ARRAY_SIZE(rotations); k++) {
 				data.rotation = rotations[k];
 
-				// this combination will never happen.
-				if (igt_rotation_90_or_270(data.rotation) ||
-				    (data.rotation & IGT_REFLECT_X &&
-				     modifiers[i].modifier == DRM_FORMAT_MOD_LINEAR))
-					continue;
-
-				igt_describe("test maximum hardware supported stride length for given bpp and modifiers.");
+				igt_describe("Test maximum hardware stride for given format and modifier.");
 				igt_subtest_f("%s-max-hw-stride-%s-rotate-%s%s",
 					      modifiers[i].name, formats[j].name,
 					      igt_plane_rotation_name(data.rotation),
@@ -1237,7 +1133,7 @@ igt_main
 				}
 
 				data.async_flip_test = true;
-				igt_describe("test async flip on maximum hardware supported stride length for given bpp and modifiers.");
+				igt_describe("Test maximum hardware stride for given format and modifier, using async flips.");
 				igt_subtest_f("%s-max-hw-stride-%s-rotate-%s%s-async-flip",
 					      modifiers[i].name, formats[j].name,
 					      igt_plane_rotation_name(data.rotation),
