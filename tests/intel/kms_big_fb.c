@@ -419,8 +419,12 @@ static void prep_small_fb(data_t *data, int width, int height)
 
 static void prep_big_fb(data_t *data)
 {
-	if (data->big_fb.fb_id)
-		return;
+	if (data->big_fb.fb_id &&
+	    (data->big_fb.width != data->big_fb_width ||
+	     data->big_fb.height != data->big_fb_height)) {
+		igt_remove_fb(data->drm_fd, &data->big_fb_solid);
+		igt_remove_fb(data->drm_fd, &data->big_fb);
+	}
 
 	if (!data->big_fb.fb_id) {
 		igt_create_fb(data->drm_fd,
