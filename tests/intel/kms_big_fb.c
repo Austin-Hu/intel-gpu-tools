@@ -449,7 +449,19 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		 *width, *height);
 }
 
-static void prep_fb(data_t *data)
+static void prep_small_fb(data_t *data, int width, int height)
+{
+	if (data->small_fb.fb_id &&
+	    (data->small_fb.width != width ||
+	     data->small_fb.height != height))
+		igt_remove_fb(data->drm_fd, &data->small_fb);
+
+	if (!data->small_fb.fb_id)
+		igt_create_fb(data->drm_fd, width, height,
+			      data->format, data->modifier, &data->small_fb);
+}
+
+static void prep_big_fb(data_t *data)
 {
 	if (data->big_fb.fb_id)
 		return;
@@ -567,7 +579,7 @@ static bool test_plane(data_t *data)
 		 * To speed up skips we delay the big fb creation until
 		 * the above rotation related check has been performed.
 		 */
-		prep_fb(data);
+		prep_big_fb(data);
 
 		/*
 		 * Make a 1:1 copy of the desired part of the big fb
@@ -630,8 +642,7 @@ static bool test_pipe(data_t *data)
 	if (igt_rotation_90_or_270(data->rotation))
 		igt_swap(width, height);
 
-	igt_create_fb(data->drm_fd, width, height,
-		      data->format, data->modifier, &data->small_fb);
+	prep_small_fb(data, width, height);
 
 	igt_output_set_pipe(data->output, data->pipe);
 
