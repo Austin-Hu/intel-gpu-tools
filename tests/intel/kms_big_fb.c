@@ -32,6 +32,7 @@
 
 #include "igt.h"
 #include <errno.h>
+#include <limits.h>
 #include <poll.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -901,25 +902,33 @@ test_addfb(data_t *data)
 	gem_close(data->drm_fd, bo);
 }
 
-/*
- * TODO: adapt i9xx_plane_max_stride(..) here from intel_display.c
- * in kernel sources to support older gen for max hw stride length
- * testing.
- */
-static void
-set_max_hw_stride(data_t *data)
+static void intel_max_hw_stride(uint32_t devid,
+				uint64_t modifier,
+				int *pixels, int *bytes)
 {
-	if (intel_display_ver(data->devid) >= 13) {
-		/*
-		 * The stride in bytes must not exceed of the size
-		 * of 128K bytes. For pixel formats of 64bpp will allow
-		 * for a 16K pixel surface.
-		 */
-		data->max_hw_stride_pixels = 65536;
-		data->max_hw_stride_bytes = 131072;
-	} else {
-		data->max_hw_stride_pixels = 8192;
-		data->max_hw_stride_bytes = 32768;
+	/* should be kept in sync with the kernel imposed limits */
+	if (intel_display_ver(devid) >= 13) {
+		*pixels = 65536;
+		*bytes = 128 * 1024;
+	} else if (intel_display_ver(devid) >= 9 ||
+		   IS_BROADWELL(devid) || IS_HASWELL(devid)) {
+		*pixels = 8192;
+		*bytes = 32 * 1024;
+	} else if (intel_display_ver(devid) >= 4) {
+		if (modifier == I915_FORMAT_MOD_X_TILED)
+			*pixels = 4096;
+		else
+			*pixels = INT_MAX;
+		*bytes = 32 * 1024;
+	} else if (intel_display_ver(devid) == 3) {
+		*pixels = INT_MAX;
+		if (modifier == I915_FORMAT_MOD_X_TILED)
+			*bytes = 8 * 1024;
+		else
+			*bytes = 16 * 1024;
+	} else if (intel_display_ver(devid) == 2) {
+		*pixels = INT_MAX;
+		*bytes = 8 * 1024;
 	}
 }
 
@@ -1131,7 +1140,9 @@ igt_main
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		data.modifier = modifiers[i].modifier;
 
-		set_max_hw_stride(&data);
+		intel_max_hw_stride(data.devid, data.modifier,
+				    &data.max_hw_stride_pixels,
+				    &data.max_hw_stride_bytes);
 
 		for (int j = 0; j < ARRAY_SIZE(formats); j++) {
 			data.format = formats[j].format;
