@@ -229,8 +229,8 @@ typedef struct {
 	struct intel_bb *ibb;
 	bool max_hw_stride_test;
 	bool async_flip_test;
-	int hw_stride;
-	int max_hw_fb_width;
+	int max_hw_stride_pixels;
+	int max_hw_stride_bytes;
 	double planeclearrgb[3];
 } data_t;
 
@@ -410,9 +410,12 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		*width = 8192;
 		*height = 8192;
 	} else if (data->max_hw_stride_test) {
+		int cpp = igt_drm_format_to_bpp(format) / 8;
 		igt_output_t *output;
 
-		*width = data->max_hw_fb_width;
+		*width = data->max_fb_width;
+		*width = min(*width, data->max_hw_stride_pixels);
+		*width = min(*width, data->max_hw_stride_bytes / cpp);
 		*height = 0;
 
 		for_each_connected_output(&data->display, output) {
@@ -474,8 +477,8 @@ static void prep_big_fb(data_t *data)
 	} else {
 		setup_fb(data, &data->big_fb, data->big_fb_width,
 			 data->big_fb_height, data->format, data->modifier,
-			 data->hw_stride);
-		igt_debug("using stride length %d\n", data->hw_stride);
+			 data->max_hw_stride_bytes);
+		igt_debug("using stride length %d\n", data->max_hw_stride_bytes);
 	}
 
 	generate_pattern(data, &data->big_fb, 640, 480);
@@ -721,20 +724,20 @@ max_hw_stride_async_flip_test(data_t *data)
 	data->ibb = intel_bb_create(data->drm_fd, 4096);
 
 	setup_fb(data, &data->big_fb, data->big_fb_width, data->big_fb_height,
-		 data->format, data->modifier, data->hw_stride);
+		 data->format, data->modifier, data->max_hw_stride_bytes);
 	generate_pattern(data, &data->big_fb, 640, 480);
 
 	data->planeclearrgb[1] = 1.0;
 
 	setup_fb(data, &data->big_fb_flip[0], data->big_fb_width,
 		 data->big_fb_height, data->format, data->modifier,
-		 data->hw_stride);
+		 data->max_hw_stride_bytes);
 
 	data->planeclearrgb[1] = 0.0;
 
 	setup_fb(data, &data->big_fb_flip[1], data->big_fb_width,
 		 data->big_fb_height, data->format, data->modifier,
-		 data->hw_stride);
+		 data->max_hw_stride_bytes);
 	generate_pattern(data, &data->big_fb_flip[1], 640, 480);
 
 	data->pipe_crc = igt_pipe_crc_new(data->drm_fd, data->pipe,
@@ -987,9 +990,11 @@ set_max_hw_stride(data_t *data)
 		 * of 128K bytes. For pixel formats of 64bpp will allow
 		 * for a 16K pixel surface.
 		 */
-		data->hw_stride = 131072;
+		data->max_hw_stride_pixels = 65536;
+		data->max_hw_stride_bytes = 131072;
 	} else {
-		data->hw_stride = 32768;
+		data->max_hw_stride_pixels = 8192;
+		data->max_hw_stride_bytes = 32768;
 	}
 }
 
@@ -1228,7 +1233,6 @@ igt_main
 					      igt_plane_rotation_name(data.rotation),
 					      rotation_flip_str(data.rotation)) {
 					igt_require(intel_display_ver(intel_get_drm_devid(data.drm_fd)) >= 5);
-					data.max_hw_fb_width = min(data.hw_stride / (bpp >> 3), data.max_fb_width);
 					test_scanout(&data);
 				}
 
@@ -1239,7 +1243,6 @@ igt_main
 					      igt_plane_rotation_name(data.rotation),
 					      rotation_flip_str(data.rotation)) {
 					igt_require(has_async_flip(&data));
-					data.max_hw_fb_width = min(data.hw_stride / (bpp >> 3), data.max_fb_width);
 					test_scanout(&data);
 				}
 				data.async_flip_test = false;
