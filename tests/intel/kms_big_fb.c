@@ -302,6 +302,27 @@ static void copy_pattern(data_t *data,
 	intel_bb_reset(data->ibb, true);
 }
 
+/* FIXME implement a direct solid fill for every platform */
+static void fill(data_t *data, struct igt_fb *fb,
+		 float r, float g, float b)
+{
+	struct igt_fb color_fb;
+	int w = 512, h = 512;
+
+	igt_create_color_fb(data->drm_fd, w, h,
+			    data->format, data->modifier,
+			    r, g, b, &color_fb);
+
+	for (int y = 0; y < fb->height; y += h) {
+		for (int x = 0; x < fb->width; x += w) {
+			copy_pattern(data, fb, x, y,
+				     &color_fb, 0, 0, w, h);
+		}
+	}
+
+	igt_remove_fb(data->drm_fd, &color_fb);
+}
+
 static void generate_pattern(data_t *data,
 			     struct igt_fb *fb,
 			     int w, int h)
@@ -465,11 +486,11 @@ static void prep_big_fb(data_t *data)
 	}
 
 	if (data->async_flip_test && !data->big_fb_solid.fb_id) {
-		igt_create_color_fb(data->drm_fd,
-				    data->big_fb_width, data->big_fb_height,
-				    data->format, data->modifier,
-				    0.0, 1.0, 0.0,
-				    &data->big_fb_solid);
+		igt_create_fb(data->drm_fd,
+			      data->big_fb_width, data->big_fb_height,
+			      data->format, data->modifier,
+			      &data->big_fb_solid);
+		fill(data, &data->big_fb_solid, 0.0f, 1.0f, 0.0f);
 	}
 }
 
