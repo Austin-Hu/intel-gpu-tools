@@ -328,24 +328,36 @@ static void generate_pattern(data_t *data,
 	igt_remove_fb(data->drm_fd, &pat_fb);
 }
 
-static bool size_ok(data_t *data, uint64_t size)
+static bool uses_ggtt(data_t *data)
+{
+	/* DPT uses very little GGTT so no need to worry about it. */
+	return intel_display_ver(data->devid) < 13 ||
+		data->modifier == DRM_FORMAT_MOD_LINEAR;
+}
+
+static bool uses_mappable(data_t *data)
 {
 	/*
 	 * The kernel limits scanout to the
 	 * mappable portion of ggtt on gmch platforms.
 	 */
-	if ((intel_display_ver(data->devid) < 5 ||
-	     IS_VALLEYVIEW(data->devid) ||
-	     IS_CHERRYVIEW(data->devid)) &&
-	    size > data->mappable_size / 2)
+	return intel_display_ver(data->devid) < 5 ||
+		IS_VALLEYVIEW(data->devid) ||
+		IS_CHERRYVIEW(data->devid);
+}
+
+static bool size_ok(data_t *data, uint64_t size)
+{
+	/* Limit the big fb size based on available RAM or aperture size */
+	float limit = data->async_flip_test ? 2.5f : 1.5f;
+
+	if (uses_mappable(data) && size > data->mappable_size / limit)
 		return false;
 
-	/*
-	 * Limit the big fb size to at most half the RAM or half
-	 * the aperture size. Could go a bit higher I suppose since
-	 * we shouldn't need more than one big fb at a time.
-	 */
-	if (size > data->ram_size / 2 || size > data->aper_size / 2)
+	if (uses_ggtt(data) && size > data->aper_size / limit)
+		return false;
+
+	if (size > data->ram_size / limit)
 		return false;
 
 	return true;
