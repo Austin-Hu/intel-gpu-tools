@@ -2054,6 +2054,51 @@ void igt_paint_image(cairo_t *cr, const char *filename,
 }
 
 /**
+ * igt_create_fb_initialized:
+ * @fb: pointer to an already initialized #igt_fb structure
+ *
+ * This function allocates a gem buffer object suitable to back a framebuffer
+ * with the already filled properties and then wraps it up in a drm framebuffer
+ * object of the requested size. All metadata is stored in @fb.
+ *
+ * @fb must have been previously initialized with igt_init_fb(), and its
+ * size/stride information must also have been filled with eg. igt_calc_fb_size().
+ *
+ * The backing storage of the framebuffer is filled with all zeros, i.e. black
+ * for rgb pixel formats.
+ *
+ * Returns:
+ * The kms id of the created framebuffer.
+ */
+unsigned int
+igt_create_fb_initialized(struct igt_fb *fb)
+{
+	uint32_t flags = 0;
+
+	igt_debug("%s(width=%d, height=%d, format=" IGT_FORMAT_FMT
+		  ", modifier=0x%"PRIx64", size=%"PRIu64")\n",
+		  __func__, fb->width, fb->height,
+		  IGT_FORMAT_ARGS(fb->drm_format), fb->modifier, fb->size);
+
+	create_bo_for_fb(fb, false);
+	igt_assert(fb->gem_handle > 0);
+
+	igt_debug("%s(handle=%d, pitch=%d)\n",
+		  __func__, fb->gem_handle, fb->strides[0]);
+
+	if (fb->modifier || igt_has_fb_modifiers(fb->fd))
+		flags = DRM_MODE_FB_MODIFIERS;
+
+	do_or_die(__kms_addfb(fb->fd, fb->gem_handle,
+			      fb->width, fb->height,
+			      fb->drm_format, fb->modifier,
+			      fb->strides, fb->offsets, fb->num_planes, flags,
+			      &fb->fb_id));
+
+	return fb->fb_id;
+}
+
+/**
  * igt_create_fb_with_bo_size:
  * @fd: open i915 drm file descriptor
  * @width: width of the framebuffer in pixel
@@ -2084,8 +2129,6 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 			   struct igt_fb *fb, uint64_t bo_size,
 			   unsigned bo_stride)
 {
-	uint32_t flags = 0;
-
 	igt_init_fb(fb, fd, width, height, format, modifier,
 		    color_encoding, color_range);
 
@@ -2094,27 +2137,7 @@ igt_create_fb_with_bo_size(int fd, int width, int height,
 
 	fb->size = bo_size;
 
-	igt_debug("%s(width=%d, height=%d, format=" IGT_FORMAT_FMT
-		  ", modifier=0x%"PRIx64", size=%"PRIu64")\n",
-		  __func__, width, height, IGT_FORMAT_ARGS(format), modifier,
-		  bo_size);
-
-	create_bo_for_fb(fb, false);
-	igt_assert(fb->gem_handle > 0);
-
-	igt_debug("%s(handle=%d, pitch=%d)\n",
-		  __func__, fb->gem_handle, fb->strides[0]);
-
-	if (fb->modifier || igt_has_fb_modifiers(fd))
-		flags = DRM_MODE_FB_MODIFIERS;
-
-	do_or_die(__kms_addfb(fb->fd, fb->gem_handle,
-			      fb->width, fb->height,
-			      fb->drm_format, fb->modifier,
-			      fb->strides, fb->offsets, fb->num_planes, flags,
-			      &fb->fb_id));
-
-	return fb->fb_id;
+	return igt_create_fb_initialized(fb);
 }
 
 /**

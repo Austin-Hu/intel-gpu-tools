@@ -131,6 +131,8 @@ void igt_init_fb(struct igt_fb *fb, int fd, int width, int height,
 		 enum igt_color_encoding color_encoding,
 		 enum igt_color_range color_range);
 unsigned int
+igt_create_fb_initialized(struct igt_fb *fb);
+unsigned int
 igt_create_fb_with_bo_size(int fd, int width, int height,
 			   uint32_t format, uint64_t modifier,
 			   enum igt_color_encoding color_encoding,

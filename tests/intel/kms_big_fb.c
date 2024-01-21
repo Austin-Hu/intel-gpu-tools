@@ -403,8 +403,16 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		max_height = data->max_fb_height;
 	}
 
-	*width = max_width;
-	*height = max_height;
+	if (data->max_hw_stride_test) {
+		int cpp = igt_drm_format_to_bpp(format) / 8;
+
+		*width = min(data->max_hw_stride_pixels,
+			     data->max_hw_stride_bytes / cpp);
+		*height = *width;
+	} else {
+		*width = max_width;
+		*height = max_height;
+	}
 
 	/*
 	 * max fence stride is only 8k bytes on gen3 vs. 4k max fb width,
@@ -468,6 +476,34 @@ static void prep_small_fb(data_t *data, int width, int height)
 			      data->format, data->modifier, &data->small_fb);
 }
 
+static void create_big_fb(data_t *data, struct igt_fb *fb)
+{
+	struct igt_fb fb_dim;
+
+	igt_init_fb(fb, data->drm_fd,
+		    data->big_fb_width, data->big_fb_height,
+		    data->format, data->modifier,
+		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+	igt_calc_fb_size(fb);
+
+	/*
+	 * Calculate the width/height clamped to
+	 * the kernel imposed maximum limits.
+	 */
+	igt_init_fb(&fb_dim, data->drm_fd,
+		    min(fb->width, data->max_fb_width),
+		    min(fb->height, data->max_fb_height),
+		    data->format, data->modifier,
+		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
+
+	fb->width = fb_dim.width;
+	fb->height = fb_dim.height;
+	memcpy(fb->plane_width, fb_dim.plane_width, sizeof(fb->plane_width));
+	memcpy(fb->plane_height, fb_dim.plane_height, sizeof(fb->plane_height));
+
+	igt_create_fb_initialized(fb);
+}
+
 static void prep_big_fb(data_t *data)
 {
 	if (data->big_fb.fb_id &&
@@ -478,18 +514,12 @@ static void prep_big_fb(data_t *data)
 	}
 
 	if (!data->big_fb.fb_id) {
-		igt_create_fb(data->drm_fd,
-			      data->big_fb_width, data->big_fb_height,
-			      data->format, data->modifier,
-			      &data->big_fb);
+		create_big_fb(data, &data->big_fb);
 		generate_pattern(data, &data->big_fb, 640, 480);
 	}
 
 	if (data->async_flip_test && !data->big_fb_solid.fb_id) {
-		igt_create_fb(data->drm_fd,
-			      data->big_fb_width, data->big_fb_height,
-			      data->format, data->modifier,
-			      &data->big_fb_solid);
+		create_big_fb(data, &data->big_fb_solid);
 		fill(data, &data->big_fb_solid, 0.0f, 1.0f, 0.0f);
 	}
 }
