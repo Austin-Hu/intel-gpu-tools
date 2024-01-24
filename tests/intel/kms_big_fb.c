@@ -502,9 +502,19 @@ static void max_fb_size(data_t *data, int *width, int *height,
 
 	if (0 && data->max_hw_stride_test) {
 		int cpp = igt_drm_format_to_bpp(format) / 8;
+		unsigned int tw, th;
 
 		*width = min(data->max_hw_stride_pixels,
 			     data->max_hw_stride_bytes / cpp);
+
+		igt_get_fb_tile_size(data->drm_fd, data->modifier, cpp*8, &tw, &th);
+		if (th == 1)
+			th = 2;
+
+		if (igt_rotation_90_or_270(data->rotation))
+			*width -= th;
+		else
+			*width -= tw / cpp;
 		*height = *width;
 	} else {
 		*width = max_width;
