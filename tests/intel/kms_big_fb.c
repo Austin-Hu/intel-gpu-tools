@@ -354,6 +354,45 @@ static void fill(data_t *data, struct igt_fb *fb,
 		fill_copy(data, fb, r, g, b);
 }
 
+static void fill2(data_t *data, struct igt_fb *fb)
+{
+	struct igt_fb color_fb;
+	int cpp = igt_drm_format_to_bpp(fb->drm_format) / 8;
+	unsigned int w, h;
+	unsigned int phase = 0;
+
+	igt_get_fb_tile_size(data->drm_fd, fb->modifier, cpp*8, &w, &h);
+
+	for (int y = 0; y < fb->height; y += h) {
+		struct {
+			float r,g,b;
+		} colors[] = {
+			{ 0.0f, 0.0f, 1.0f, },
+			{ 0.0f, 1.0f, 0.0f, },
+			{ 1.0f, 0.0f, 0.0f, },
+			{ 0.0f, 1.0f, 1.0f, },
+			{ 1.0f, 0.0f, 1.0f, },
+			{ 1.0f, 1.0f, 0.0f, },
+			{ 1.0f, 1.0f, 1.0f, },
+			{ 0.0f, 0.0f, 0.0f, },
+		};
+
+		igt_create_color_fb(data->drm_fd, w, h,
+				    data->format, data->modifier,
+				    colors[phase & 7].r,
+				    colors[phase & 7].g,
+				    colors[phase & 7].b, &color_fb);
+		phase++;
+
+		for (int x = 0; x < fb->width; x += w) {
+			copy_pattern(data, fb, x, y,
+				     &color_fb, 0, 0, w, h);
+		}
+
+		igt_remove_fb(data->drm_fd, &color_fb);
+	}
+}
+
 static void generate_pattern(data_t *data,
 			     struct igt_fb *fb,
 			     int w, int h)
@@ -642,6 +681,8 @@ static void prep_big_fb(data_t *data)
 		if (igt_fb_is_gen12_rc_ccs_cc_modifier(data->big_fb.modifier) &&
 		    data->render_clear)
 			fill_clear(data, &data->big_fb, 1.0f, 0.0f, 0.0f);
+
+		fill2(data, &data->big_fb);
 
 		generate_pattern(data, &data->big_fb, 640, 480);
 	}
