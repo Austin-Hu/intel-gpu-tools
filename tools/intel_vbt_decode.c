@@ -1575,6 +1575,9 @@ static void dump_lfp_options(struct context *context,
 		printf("\t\tChannel type: %s (0x%x)\n",
 		       channel_type[val], val);
 
+		if (block->size < 4)
+			continue;
+
 		printf("\t\tSSC: %s\n",
 		       YESNO(panel_bool(options->ssc_bits, i)));
 
