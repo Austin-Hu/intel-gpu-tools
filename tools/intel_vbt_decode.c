@@ -686,6 +686,9 @@ static void dump_general_features(struct context *context,
 	printf("\tLegacy monitor detect: %s\n",
 	       YESNO(features->legacy_monitor_detect));
 
+	if (block->size < 5)
+		return;
+
 	printf("\tIntegrated CRT: %s\n", YESNO(features->int_crt_support));
 	printf("\tIntegrated TV: %s\n", YESNO(features->int_tv_support));
 	printf("\tIntegrated EFP: %s\n", YESNO(features->int_efp_support));
