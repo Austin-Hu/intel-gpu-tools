@@ -326,7 +326,7 @@ static size_t block_min_size(const struct context *context, int section_id)
 		return sizeof(struct bdb_driver_features);
 	case BDB_SDVO_LVDS_OPTIONS:
 		return sizeof(struct bdb_sdvo_lvds_options);
-	case BDB_SDVO_PANEL_DTDS:
+	case BDB_SDVO_LVDS_DTD:
 		/* FIXME? */
 		return 0;
 	case BDB_EDP:
@@ -1953,8 +1953,8 @@ print_detail_timing_data(const struct bdb_edid_dtd *dvo_timing)
 	printf("\tclock: %d\n", dvo_timing->clock * 10);
 }
 
-static void dump_sdvo_panel_dtds(struct context *context,
-				 const struct bdb_block *block)
+static void dump_sdvo_lvds_dtd(struct context *context,
+			       const struct bdb_block *block)
 {
 	const struct bdb_edid_dtd *dvo_timing = block_data(block);
 	int n, count;
@@ -2723,9 +2723,9 @@ struct dumper dumpers[] = {
 		.dump = dump_sdvo_lvds_options,
 	},
 	{
-		.id = BDB_SDVO_PANEL_DTDS,
-		.name = "SDVO panel dtds",
-		.dump = dump_sdvo_panel_dtds,
+		.id = BDB_SDVO_LVDS_DTD,
+		.name = "SDVO LVDS DTD",
+		.dump = dump_sdvo_lvds_dtd,
 	},
 	{
 		.id = BDB_DRIVER_FEATURES,
