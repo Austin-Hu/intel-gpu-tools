@@ -3729,6 +3729,10 @@ struct dumper dumpers[] = {
 		.dump = dump_driver_persistence,
 	},
 	{
+		.id = BDB_EXT_TABLE_PTRS,
+		.name = "Ext table pointers, VBIOS only",
+	},
+	{
 		.id = BDB_DOT_CLOCK_OVERRIDE,
 		.name = "Dot clock override",
 		.dump = dump_dot_clock_override,
@@ -3854,6 +3858,10 @@ struct dumper dumpers[] = {
 		.dump = dump_chromaticity,
 	},
 	{
+		.id = BDB_MIPI,
+		.name = "MIPI",
+	},
+	{
 		.id = BDB_FIXED_SET_MODE,
 		.name = "Fixed set mode",
 		.dump = dump_fixed_set_mode,
@@ -3889,9 +3897,17 @@ struct dumper dumpers[] = {
 		.dump = dump_generic_dtd,
 	},
 	{
+		.id = BDB_INT15_HOOK,
+		.name = "INT15h hook",
+	},
+	{
 		.id = BDB_PRD_TABLE,
 		.name = "PRD table",
 		.dump = dump_prd_table,
+	},
+	{
+		.id = BDB_SKIP,
+		.name = "VBIOS only",
 	},
 };
 
