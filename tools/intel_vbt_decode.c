@@ -386,6 +386,8 @@ static size_t block_min_size(const struct context *context, int section_id)
 		return sizeof(struct bdb_lfp_power);
 	case BDB_EDP_BFI:
 		return sizeof(struct bdb_edp_bfi);
+	case BDB_CHROMATICITY:
+		return sizeof(struct bdb_chromaticity);
 	case BDB_MIPI_CONFIG:
 		return sizeof(struct bdb_mipi_config);
 	case BDB_MIPI_SEQUENCE:
@@ -2717,6 +2719,41 @@ static void dump_edp_bfi(struct context *context,
 	}
 }
 
+static void dump_chromaticity(struct context *context,
+			      const struct bdb_block *block)
+{
+	const struct bdb_chromaticity *chromaticity = block_data(block);
+	int count;
+
+	count = min(block->size / sizeof(chromaticity->chromaticity[0]), (size_t)16);
+
+	for (int i = 0; i < count; i++) {
+		const struct chromaticity *c = &chromaticity->chromaticity[i];
+
+		if (i != context->panel_type && !context->dump_all_panel_types)
+			continue;
+
+		printf("\tPanel %d%s\n", i,
+		       context->panel_type == i ? " *" : "");
+
+		printf("\t\tUse chromaticity values from EDID base block: %s\n",
+		       YESNO(c->chromaticity_from_edid_base_block));
+		printf("\t\tEnable chromaticity: %s\n",
+		       YESNO(c->chromaticity_enable));
+
+		printf("\t\tRed/green chromaticity coordinates: %d\n", c->red_green);
+		printf("\t\tBlue/white chromaticity coordinates: %d\n", c->blue_white);
+		printf("\t\tRed X coordinate: %d\n", c->red_x);
+		printf("\t\tRed Y coordinate: %d\n", c->red_y);
+		printf("\t\tGreen X coordinate: %d\n", c->green_x);
+		printf("\t\tGreen Y coordinate: %d\n", c->green_y);
+		printf("\t\tBlue X coordinate: %d\n", c->blue_x);
+		printf("\t\tBlue Y coordinate: %d\n", c->blue_y);
+		printf("\t\tWhite X coordinate: %d\n", c->white_x);
+		printf("\t\tWhite Y coordinate: %d\n", c->white_y);
+	}
+}
+
 static void dump_mipi_config(struct context *context,
 			     const struct bdb_block *block)
 {
@@ -3618,6 +3655,11 @@ struct dumper dumpers[] = {
 		.id = BDB_EDP_BFI,
 		.name = "eDP BFI",
 		.dump = dump_edp_bfi,
+	},
+	{
+		.id = BDB_CHROMATICITY,
+		.name = "Chromaticity for narrow gamut panel",
+		.dump = dump_chromaticity,
 	},
 	{
 		.id = BDB_MIPI_CONFIG,
