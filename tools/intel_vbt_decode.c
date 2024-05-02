@@ -422,7 +422,6 @@ static size_t block_min_size(const struct context *context, int section_id)
 	case BDB_VSWING_PREEMPH:
 		return sizeof(struct bdb_vswing_preemph);
 	case BDB_GENERIC_DTD:
-		/* FIXME check spec */
 		return sizeof(struct bdb_generic_dtd);
 	default:
 		return 0;
@@ -3419,6 +3418,48 @@ static void dump_vswing_preemphasis(struct context *context,
 	}
 }
 
+static void dump_generic_dtd_entry(const struct generic_dtd_entry *dtd,
+				   const char *prefix)
+{
+	printf("%shdisplay: %d\n", prefix, dtd->hactive);
+	printf("%shsync [%d, %d] %s\n", prefix,
+	       dtd->hactive + dtd->hfront_porch,
+	       dtd->hactive + dtd->hfront_porch + dtd->hsync,
+	       dtd->hsync_positive_polarity ? "+sync" : "-sync");
+	printf("%shtotal: %d\n", prefix, dtd->hactive + dtd->hblank);
+
+	printf("%svdisplay: %d\n", prefix, dtd->vactive);
+	printf("%svsync [%d, %d] %s\n", prefix,
+	       dtd->vactive + dtd->vfront_porch,
+	       dtd->vactive + dtd->vfront_porch + dtd->vsync,
+	       dtd->vsync_positive_polarity ? "+sync" : "-sync");
+	printf("%svtotal: %d\n", prefix, dtd->vactive + dtd->vblank);
+
+	printf("%sclock: %d\n", prefix, dtd->pixel_clock * 10);
+}
+
+static void dump_generic_dtd(struct context *context,
+			     const struct bdb_block *block)
+{
+	const struct bdb_generic_dtd *gdtd = block_data(block);
+	int num_entries;
+
+	if (sizeof(gdtd->dtd[0]) != gdtd->gdtd_size) {
+		printf("\tDTD struct sizes don't match (expected %zu, got %u), skipping\n",
+		       sizeof(gdtd->dtd[0]), gdtd->gdtd_size);
+		return;
+	}
+
+	num_entries = (block->size - sizeof(*gdtd)) / gdtd->gdtd_size;
+
+	printf("\tEntry size: %d\n", gdtd->gdtd_size);
+
+	for (int i = 0; i < num_entries; i++) {
+		printf("\tEntry #%d (%s #%d):\n", i+1, i >= 16 ? "EFP" : "LFP", i % 16 + 1);
+		dump_generic_dtd_entry(&gdtd->dtd[i], "\t\t");
+	}
+}
+
 static int get_panel_type_pnpid(const struct context *context,
 				const char *edid_file)
 {
@@ -3776,6 +3817,11 @@ struct dumper dumpers[] = {
 		.id = BDB_VSWING_PREEMPH,
 		.name = "Vswing Preemph",
 		.dump = dump_vswing_preemphasis,
+	},
+	{
+		.id = BDB_GENERIC_DTD,
+		.name = "Generic DTD",
+		.dump = dump_generic_dtd,
 	},
 };
 
