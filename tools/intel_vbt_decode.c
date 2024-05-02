@@ -342,6 +342,8 @@ static size_t block_min_size(const struct context *context, int section_id)
 		return sizeof(struct bdb_dot_clock_override);
 	case BDB_DISPLAY_SELECT_OLD:
 		return sizeof(struct bdb_display_select_old);
+	case BDB_SV_TEST_FUNCTIONS:
+		return sizeof(struct bdb_sv_test_functions);
 	case BDB_DISPLAY_REMOVE_OLD:
 		return sizeof(struct bdb_display_remove_old);
 	case BDB_SDVO_LVDS_OPTIONS:
@@ -2139,6 +2141,15 @@ static void dump_display_select_hsw(struct context *context,
 	}
 }
 
+static void dump_sv_test_functions(struct context *context,
+				   const struct bdb_block *block)
+{
+	const struct bdb_sv_test_functions *sv = block_data(block);
+
+	for (int i = 0 ; i < ARRAY_SIZE(sv->sv_bits); i++)
+		printf("\tSV bits %d: 0x%02x\n", i+1, sv->sv_bits[i]);
+}
+
 static void dump_display_remove_old(struct context *context,
 				    const struct bdb_block *block)
 {
@@ -3321,6 +3332,11 @@ struct dumper dumpers[] = {
 		.id = BDB_DISPLAY_SELECT_OLD,
 		.name = "Toggle list block (pre-IVB)",
 		.dump = dump_display_select_old,
+	},
+	{
+		.id = BDB_SV_TEST_FUNCTIONS,
+		.name = "SV test functions",
+		.dump = dump_sv_test_functions,
 	},
 	{
 		.id = BDB_DISPLAY_REMOVE_OLD,
