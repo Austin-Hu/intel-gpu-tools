@@ -963,6 +963,16 @@ void igt_calc_fb_size(struct igt_fb *fb)
 		size += calc_plane_size(fb, plane);
 	}
 
+	/*
+	 * We always need a clear color on TGL, make some extra
+	 * room for one it if it's not explicit in the modifier.
+	 *
+	 * TODO: probably better to allocate this as part of the
+	 * batch instead so the fb size doesn't need to change...
+	 */
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS)
+		size = ALIGN(size + 64, 64);
+
 	if (is_xe_device(fb->fd))
 		size = ALIGN(size, xe_get_default_alignment(fb->fd));
 
@@ -2660,6 +2670,20 @@ igt_fb_create_intel_buf(int fd, struct buf_ops *bops,
 
 	if (fb->modifier == I915_FORMAT_MOD_4_TILED_DG2_RC_CCS_CC)
 		buf->cc.offset = fb->offsets[1];
+
+	/*
+	 * TGL appears to do automagic fast clear when rendering
+	 * black and the clear color isn't specified, or when the
+	 * output matches the specified clear color. Force a
+	 * non-sensical clear color to prevent it from doing this
+	 * when using a non-clear color modifier.
+	 *
+	 * TODO: figure out if other platforms are affected...
+	 */
+	if (fb->modifier == I915_FORMAT_MOD_Y_TILED_GEN12_RC_CCS) {
+		buf->cc.disable = true;
+		buf->cc.offset = fb->size - 64;
+	}
 
 	return buf;
 }
