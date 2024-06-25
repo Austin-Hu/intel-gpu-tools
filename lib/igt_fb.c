@@ -2568,6 +2568,9 @@ static bool use_enginecopy(const struct igt_fb *fb)
 
 static bool use_blitter(const struct igt_fb *fb)
 {
+	if (!is_intel_device(fb->fd))
+		return false;
+
 	if (!blitter_ok(fb))
 		return false;
 
