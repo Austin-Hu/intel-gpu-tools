@@ -227,6 +227,7 @@ typedef struct {
 	int big_fb_width, big_fb_height;
 	uint64_t ram_size, aper_size, mappable_size;
 	igt_render_copyfunc_t render_copy;
+	igt_render_clearfunc_t render_clear;
 	struct buf_ops *bops;
 	struct intel_bb *ibb;
 	bool max_hw_stride_test;
@@ -303,8 +304,8 @@ static void copy_pattern(data_t *data,
 }
 
 /* FIXME implement a direct solid fill for every platform */
-static void fill(data_t *data, struct igt_fb *fb,
-		 float r, float g, float b)
+static void fill_copy(data_t *data, struct igt_fb *fb,
+		      float r, float g, float b)
 {
 	struct igt_fb color_fb;
 	int w = 512, h = 512;
@@ -321,6 +322,36 @@ static void fill(data_t *data, struct igt_fb *fb,
 	}
 
 	igt_remove_fb(data->drm_fd, &color_fb);
+}
+
+static void fill_clear(data_t *data, struct igt_fb *fb,
+		       float r, float g, float b)
+{
+	float color[4] = { r, g, b, 1.0f, };
+	struct intel_buf *dst;
+
+	dst = init_buf(data, fb, "big fb dst");
+
+	if (is_i915_device(data->drm_fd))
+		gem_set_domain(data->drm_fd, fb->gem_handle,
+			       I915_GEM_DOMAIN_GTT, I915_GEM_DOMAIN_GTT);
+
+	data->render_clear(data->ibb, dst, 0, 0, fb->width, fb->height, color);
+
+	fini_buf(dst);
+
+	/* intel_bb cache doesn't know when objects dissappear, so
+	 * let's purge the cache */
+	intel_bb_reset(data->ibb, true);
+}
+
+static void fill(data_t *data, struct igt_fb *fb,
+		 float r, float g, float b)
+{
+	if (igt_fb_is_gen12_rc_ccs_cc_modifier(fb->modifier) && data->render_clear)
+		fill_clear(data, fb, r, g, b);
+	else
+		fill_copy(data, fb, r, g, b);
 }
 
 static void generate_pattern(data_t *data,
@@ -515,6 +546,11 @@ static void prep_big_fb(data_t *data)
 
 	if (!data->big_fb.fb_id) {
 		create_big_fb(data, &data->big_fb);
+
+		if (igt_fb_is_gen12_rc_ccs_cc_modifier(data->big_fb.modifier) &&
+		    data->render_clear)
+			fill_clear(data, &data->big_fb, 1.0f, 0.0f, 0.0f);
+
 		generate_pattern(data, &data->big_fb, 640, 480);
 	}
 
@@ -1140,6 +1176,8 @@ igt_main
 		 */
 		if (intel_display_ver(data.devid) >= 4)
 			data.render_copy = igt_get_render_copyfunc(data.devid);
+
+		data.render_clear = igt_get_render_clearfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
 	}
