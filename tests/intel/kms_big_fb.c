@@ -913,6 +913,11 @@ static void intel_max_hw_stride(uint32_t devid,
 	} else if (intel_display_ver(devid) == 12) {
 		*pixels = 8192;
 		*bytes = 64 * 1024;
+	} else if (intel_display_ver(devid) == 11) {
+		*pixels = 8192;
+		*bytes = 64 * 1024;
+		if (modifier == DRM_FORMAT_MOD_LINEAR)
+			*bytes -= 64;
 	} else if (intel_display_ver(devid) >= 9 ||
 		   IS_BROADWELL(devid) || IS_HASWELL(devid)) {
 		*pixels = 8192;
