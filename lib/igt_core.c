@@ -3091,7 +3091,7 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	char *line, *formatted_line;
 	char *thread_id;
 	const char *program_name;
-	const char *igt_log_level_str[] = {
+	const char * const igt_log_level_str[] = {
 		"DEBUG",
 		"INFO",
 		"WARNING",
