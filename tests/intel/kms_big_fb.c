@@ -416,6 +416,24 @@ static bool size_ok(data_t *data, uint64_t size)
 	return true;
 }
 
+static bool can_remap(data_t *data, uint64_t modifier)
+{
+	if (data->max_hw_stride_test)
+		return false;
+
+	/*
+	 * max fence stride is only 8k bytes on gen3 vs. 4k max fb width,
+	 * and remapping isn't implemented currently on gen2/3.
+	 */
+	if (intel_display_ver(data->devid) < 4)
+		return false;
+
+	/* remapping not implemented for CCS */
+	if (intel_display_ver(data->devid) < 13 && igt_fb_is_ccs_modifier(modifier))
+		return false;
+
+	return true;
+}
 
 static void max_fb_size(data_t *data, int *width, int *height,
 			uint32_t format, uint64_t modifier,
@@ -423,9 +441,8 @@ static void max_fb_size(data_t *data, int *width, int *height,
 {
 	int max_width, max_height;
 	struct igt_fb fb;
-	int i = 0;
 
-	if (intel_display_ver(data->devid) < 13 && igt_fb_is_ccs_modifier(modifier)) {
+	if (0 && intel_display_ver(data->devid) < 13 && igt_fb_is_ccs_modifier(modifier)) {
 		/* FIXME figure out what's correct */
 		max_width = 8192;
 		max_height = 8192;
@@ -434,7 +451,7 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		max_height = data->max_fb_height;
 	}
 
-	if (data->max_hw_stride_test) {
+	if (0 && data->max_hw_stride_test) {
 		int cpp = igt_drm_format_to_bpp(format) / 8;
 
 		*width = min(data->max_hw_stride_pixels,
@@ -444,12 +461,14 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		*width = max_width;
 		*height = max_height;
 	}
+	igt_info("Max usable framebuffer size for format "IGT_FORMAT_FMT" / modifier 0x%"PRIx64": %dx%d (max reported %dx%d)\n",
+		 IGT_FORMAT_ARGS(format), modifier,
+		 *width, *height, max_width, max_height);
 
-	/*
-	 * max fence stride is only 8k bytes on gen3 vs. 4k max fb width,
-	 * and remapping isn't implemented currently on gen2/3.
-	 */
-	if (data->max_hw_stride_test || intel_display_ver(data->devid) < 4) {
+
+	igt_info("max stride bytes %d pixels %d\n", 
+			data->max_hw_stride_bytes, data->max_hw_stride_pixels);
+	if (!can_remap(data, modifier)) {
 		int cpp = igt_drm_format_to_bpp(format) / 8;
 
 		if (igt_rotation_90_or_270(data->rotation)) {
@@ -460,12 +479,16 @@ static void max_fb_size(data_t *data, int *width, int *height,
 			*width = min(*width, data->max_hw_stride_bytes / cpp);
 		}
 	}
+	igt_info("Max usable framebuffer size for format "IGT_FORMAT_FMT" / modifier 0x%"PRIx64": %dx%d (max reported %dx%d)\n",
+		 IGT_FORMAT_ARGS(format), modifier,
+		 *width, *height, max_width, max_height);
 
 	igt_init_fb(&fb, data->drm_fd, *width, *height, format, modifier,
 		    IGT_COLOR_YCBCR_BT709, IGT_COLOR_YCBCR_LIMITED_RANGE);
 	igt_calc_fb_size(&fb);
 
 	while (!size_ok(data, fb.size)) {
+		igt_info("reducing from %dx%d\n", *width, *height);
 		if (data->max_hw_stride_test) {
 			/* try to keep the hw plane stride at the max */
 			if (igt_rotation_90_or_270(data->rotation))
@@ -473,8 +496,8 @@ static void max_fb_size(data_t *data, int *width, int *height,
 			else
 				*height >>= 1;
 		} else {
-			/* try to maintain roughly square dimensions */
-			if (i++ & 1)
+			/* try to maintain "normal" aspect ratio */
+			if (*width >= 2 * *height)
 				*width >>= 1;
 			else
 				*height >>= 1;
@@ -667,7 +690,8 @@ static bool test_plane(data_t *data)
 		igt_plane_set_rotation(plane, data->rotation);
 	igt_plane_set_position(plane, 0, 0);
 
-	for (int i = 0; i < ARRAY_SIZE(coords); i++) {
+	srand(0);
+	for (int i = 0; i < 100;i++) {//ARRAY_SIZE(coords); i++) {
 		igt_crc_t small_crc, big_crc;
 		struct igt_fb *big_fb;
 		int x, y;
@@ -675,8 +699,12 @@ static bool test_plane(data_t *data)
 		if (run_in_simulation)
 			i = ARRAY_SIZE(coords) - 1;
 
-		x = coords[i].x;
-		y = coords[i].y;
+//		x = coords[i].x;
+//		y = coords[i].y;
+		x = rand() % (data->big_fb_width - small_fb->width);
+		y = rand() % (data->big_fb_height - small_fb->height);
+		x = i * (data->big_fb_width - small_fb->width) / 100;
+		y = i * (data->big_fb_height - small_fb->height) / 100;
 
 		/* Hardware limitation */
 		if ((data->format == DRM_FORMAT_RGB565 &&
@@ -1176,7 +1204,6 @@ igt_main
 		 */
 		if (intel_display_ver(data.devid) >= 4)
 			data.render_copy = igt_get_render_copyfunc(data.devid);
-
 		data.render_clear = igt_get_render_clearfunc(data.devid);
 
 		data.bops = buf_ops_create(data.drm_fd);
@@ -1193,6 +1220,9 @@ igt_main
 		igt_subtest_f("%s-addfb-size-overflow",
 			      modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
+			intel_max_hw_stride(data.devid, data.modifier,
+					    &data.max_hw_stride_pixels,
+					    &data.max_hw_stride_bytes);
 			test_size_overflow(&data);
 		}
 	}
@@ -1202,6 +1232,9 @@ igt_main
 		igt_subtest_f("%s-addfb-size-offset-overflow",
 			      modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
+			intel_max_hw_stride(data.devid, data.modifier,
+					    &data.max_hw_stride_pixels,
+					    &data.max_hw_stride_bytes);
 			test_size_offset_overflow(&data);
 		}
 	}
@@ -1210,12 +1243,19 @@ igt_main
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		igt_subtest_f("%s-addfb", modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
+			intel_max_hw_stride(data.devid, data.modifier,
+					    &data.max_hw_stride_pixels,
+					    &data.max_hw_stride_bytes);
 			test_addfb(&data);
 		}
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		data.modifier = modifiers[i].modifier;
+		
+		intel_max_hw_stride(data.devid, data.modifier,
+				    &data.max_hw_stride_pixels,
+				    &data.max_hw_stride_bytes);
 
 		for (int j = 0; j < ARRAY_SIZE(formats); j++) {
 			data.format = formats[j].format;
