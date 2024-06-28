@@ -1211,6 +1211,7 @@ extern bool igt_skip_crc_compare;
 /**
  * igt_log_level:
  * @IGT_LOG_DEBUG: debug information, not printed by default
+ * @IGT_LOG_VERBOSE: verbose information, not printed by default
  * @IGT_LOG_INFO: informational message, printed by default
  * @IGT_LOG_WARN: non-fatal warnings which should be treated as test failures
  * @IGT_LOG_CRITICAL: critical errors which lead to immediate termination of tests
@@ -1220,6 +1221,7 @@ extern bool igt_skip_crc_compare;
  */
 enum igt_log_level {
 	IGT_LOG_DEBUG,
+	IGT_LOG_VERBOSE,
 	IGT_LOG_INFO,
 	IGT_LOG_WARN,
 	IGT_LOG_CRITICAL,
@@ -1237,6 +1239,14 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
  * Wrapper for igt_log() for message at the IGT_LOG_DEBUG level.
  */
 #define igt_debug(f...) igt_log(IGT_LOG_DOMAIN, IGT_LOG_DEBUG, f)
+
+/**
+ * igt_verbose:
+ * @...: format string and optional arguments
+ *
+ * Wrapper for igt_log() for message at the IGT_LOG_VERBOSE level.
+ */
+#define igt_verbose(f...) igt_log(IGT_LOG_DOMAIN, IGT_LOG_VERBOSE, f)
 
 /**
  * igt_info:

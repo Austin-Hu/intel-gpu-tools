@@ -1043,6 +1043,8 @@ static void common_init_env(void)
 	if (env) {
 		if (strcmp(env, "debug") == 0)
 			igt_log_level = IGT_LOG_DEBUG;
+		else if (strcmp(env, "verbose") == 0)
+			igt_log_level = IGT_LOG_VERBOSE;
 		else if (strcmp(env, "info") == 0)
 			igt_log_level = IGT_LOG_INFO;
 		else if (strcmp(env, "warn") == 0)
@@ -3093,6 +3095,7 @@ void igt_vlog(const char *domain, enum igt_log_level level, const char *format, 
 	const char *program_name;
 	const char * const igt_log_level_str[] = {
 		[IGT_LOG_DEBUG] = "DEBUG",
+		[IGT_LOG_VERBOSE] = "VERBOSE",
 		[IGT_LOG_INFO] = "INFO",
 		[IGT_LOG_WARN] = "WARNING",
 		[IGT_LOG_CRITICAL] = "CRITICAL",
