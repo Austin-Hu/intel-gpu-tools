@@ -235,10 +235,10 @@ test_grab_crc(data_t *data, igt_output_t *output, enum pipe pipe,
 	igt_remove_fb(data->drm_fd, &fb);
 
 	crc_str = igt_crc_to_string(crc);
-	igt_debug("CRC for a %s covered (%.02f,%.02f,%.02f) fb: %s\n",
-		  flags & TEST_POSITION_PARTIALLY_COVERED ? "partially" : "fully",
-		  fb_color->red, fb_color->green, fb_color->blue,
-		  crc_str);
+	igt_verbose("CRC for a %s covered (%.02f,%.02f,%.02f) fb: %s\n",
+		    flags & TEST_POSITION_PARTIALLY_COVERED ? "partially" : "fully",
+		    fb_color->red, fb_color->green, fb_color->blue,
+		    crc_str);
 	free(crc_str);
 }
 
@@ -275,8 +275,8 @@ test_plane_position_with_output(data_t *data,
 	drmModeModeInfo *mode;
 	igt_crc_t crc, crc2;
 
-	igt_debug("Testing connector %s using pipe %s plane %d\n", igt_output_name(output),
-		  kmstest_pipe_name(pipe), plane);
+	igt_verbose("Testing connector %s using pipe %s plane %d\n",
+		    igt_output_name(output), kmstest_pipe_name(pipe), plane);
 
 	igt_output_set_pipe(output, pipe);
 
@@ -285,8 +285,8 @@ test_plane_position_with_output(data_t *data,
 	sprite = igt_output_get_plane(output, plane);
 
 	if (primary->drm_plane->plane_id > sprite->drm_plane->plane_id) {
-		igt_debug("primary plane ID (%d) > sprite plane ID (%d), skipping plane %d\n",
-			  primary->drm_plane->plane_id, sprite->drm_plane->plane_id, plane);
+		igt_verbose("primary plane ID (%d) > sprite plane ID (%d), skipping plane %d\n",
+			    primary->drm_plane->plane_id, sprite->drm_plane->plane_id, plane);
 		return;
 	}
 
@@ -416,8 +416,8 @@ test_plane_panning_with_output(data_t *data,
 	mode = igt_output_get_mode(output);
 	primary = igt_output_get_plane(output, 0);
 
-	igt_debug("Testing connector %s using pipe %s, mode %s\n", igt_output_name(output),
-		  kmstest_pipe_name(pipe), mode->name);
+	igt_verbose("Testing connector %s using pipe %s, mode %s\n",
+		    igt_output_name(output), kmstest_pipe_name(pipe), mode->name);
 
 	create_fb_for_mode_panning(data, mode, &primary_fb);
 	igt_plane_set_fb(primary, &primary_fb);
@@ -485,7 +485,7 @@ test_plane_panning(data_t *data, enum pipe pipe)
 
 		/* test allocates 2 double-dim fbs, add one more, to be safe */
 		if (mem_size && 3 * 4 * fb_size > mem_size) {
-			igt_debug("Skipping mode %s due to low memory\n", m->name);
+			igt_verbose("Skipping mode %s due to low memory\n", m->name);
 			continue;
 		}
 
@@ -890,9 +890,9 @@ static bool test_format_plane_rgb(data_t *data, enum pipe pipe,
 				  igt_crc_t ref_crc[],
 				  struct igt_fb *fb)
 {
-	igt_debug("Testing format " IGT_FORMAT_FMT " / modifier " IGT_MODIFIER_FMT " on %s.%u\n",
-		  IGT_FORMAT_ARGS(format), IGT_MODIFIER_ARGS(modifier),
-		  kmstest_pipe_name(pipe), plane->index);
+	igt_verbose("Testing format " IGT_FORMAT_FMT " / modifier " IGT_MODIFIER_FMT " on %s.%u\n",
+		    IGT_FORMAT_ARGS(format), IGT_MODIFIER_ARGS(modifier),
+		    kmstest_pipe_name(pipe), plane->index);
 
 	return test_format_plane_colors(data, pipe, plane,
 					format, modifier,
@@ -928,13 +928,13 @@ static bool test_format_plane_yuv(data_t *data, enum pipe pipe,
 						     igt_color_range_to_str(r)))
 				continue;
 
-			igt_debug("Testing format " IGT_FORMAT_FMT " / modifier " IGT_MODIFIER_FMT
-				" (%s, %s) on %s.%u\n", IGT_FORMAT_ARGS(format),
-				IGT_MODIFIER_ARGS(modifier),
-				igt_color_encoding_to_str(e),
-				igt_color_range_to_str(r),
-				kmstest_pipe_name(pipe),
-				plane->index);
+			igt_verbose("Testing format " IGT_FORMAT_FMT " / modifier " IGT_MODIFIER_FMT
+				    " (%s, %s) on %s.%u\n", IGT_FORMAT_ARGS(format),
+				    IGT_MODIFIER_ARGS(modifier),
+				    igt_color_encoding_to_str(e),
+				    igt_color_range_to_str(r),
+				    kmstest_pipe_name(pipe),
+				    plane->index);
 
 			result &= test_format_plane_colors(data, pipe, plane,
 							   format, modifier,
@@ -980,7 +980,7 @@ static void check_allowed_plane_size_64x64(data_t *data, igt_plane_t *plane,
 	int ret;
 
 	if (!data->display.is_atomic) {
-		igt_debug("Not using 64x64 plane size on non-atomic platform\n");
+		igt_verbose("Not using 64x64 plane size on non-atomic platform\n");
 		return;
 	}
 
@@ -995,8 +995,8 @@ static void check_allowed_plane_size_64x64(data_t *data, igt_plane_t *plane,
 		*width = test_fb.width;
 		*height = test_fb.height;
 	} else {
-		igt_debug("Not using 64x64 plane size, atomic commit did not "
-			  "accept 64x64 plane size\n");
+		igt_verbose("Not using 64x64 plane size, atomic commit did not "
+			    "accept 64x64 plane size\n");
 	}
 
 	igt_remove_fb(data->drm_fd, &test_fb);
@@ -1061,7 +1061,7 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		ref.modifier = DRM_FORMAT_MOD_LINEAR;
 	} else {
 		if (!plane->drm_plane) {
-			igt_debug("Only legacy cursor ioctl supported, skipping cursor plane\n");
+			igt_verbose("Only legacy cursor ioctl supported, skipping cursor plane\n");
 			return true;
 		}
 		do_or_die(drmGetCap(data->drm_fd, DRM_CAP_CURSOR_WIDTH, &width));
@@ -1070,15 +1070,15 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 		ref.modifier = DRM_FORMAT_MOD_LINEAR;
 	}
 
-	igt_debug("Testing connector %s on %s plane %s.%u\n",
-		  igt_output_name(output), kmstest_plane_type_name(plane->type),
-		  kmstest_pipe_name(pipe), plane->index);
+	igt_verbose("Testing connector %s on %s plane %s.%u\n",
+		    igt_output_name(output), kmstest_plane_type_name(plane->type),
+		    kmstest_pipe_name(pipe), plane->index);
 
 	igt_pipe_crc_start(data->pipe_crc);
 
-	igt_debug("Testing format " IGT_FORMAT_FMT " / modifier " IGT_MODIFIER_FMT " on %s.%u\n",
-		  IGT_FORMAT_ARGS(ref.format), IGT_MODIFIER_ARGS(ref.modifier),
-		  kmstest_pipe_name(pipe), plane->index);
+	igt_verbose("Testing format " IGT_FORMAT_FMT " / modifier " IGT_MODIFIER_FMT " on %s.%u\n",
+		    IGT_FORMAT_ARGS(ref.format), IGT_MODIFIER_ARGS(ref.modifier),
+		    kmstest_pipe_name(pipe), plane->index);
 
 	check_allowed_plane_size_64x64(data, plane, &width, &height, ref.format);
 
@@ -1110,12 +1110,12 @@ static bool test_format_plane(data_t *data, enum pipe pipe,
 			continue;
 
 		if (skip_format_mod(data, f.format, f.modifier, &tested_formats)) {
-			igt_debug("Skipping format " IGT_FORMAT_FMT " / modifier "
-				  IGT_MODIFIER_FMT " on %s.%u\n",
-				  IGT_FORMAT_ARGS(f.format),
-				  IGT_MODIFIER_ARGS(f.modifier),
-				  kmstest_pipe_name(pipe),
-				  plane->index);
+			igt_verbose("Skipping format " IGT_FORMAT_FMT " / modifier "
+				    IGT_MODIFIER_FMT " on %s.%u\n",
+				    IGT_FORMAT_ARGS(f.format),
+				    IGT_MODIFIER_ARGS(f.modifier),
+				    kmstest_pipe_name(pipe),
+				    plane->index);
 			continue;
 		}
 
@@ -1164,7 +1164,7 @@ static bool skip_plane(data_t *data, igt_plane_t *plane)
 		if (IS_AMD_FMT_MOD(plane->modifiers[i]) &&
 		    (AMD_FMT_MOD_GET(DCC, plane->modifiers[i]) ||
 		     AMD_FMT_MOD_GET(DCC_RETILE, plane->modifiers[i]))) {
-			igt_debug("Skipping planes with DCC or DCC_RETILE\n");
+			igt_verbose("Skipping planes with DCC or DCC_RETILE\n");
 			return true;
 		}
 	}
@@ -1294,7 +1294,7 @@ static void test_planar_settings(data_t *data)
 		igt_remove_fb(data->drm_fd, &fb);
 		igt_assert_f(rval == expected_rval, "Odd width NV12 framebuffer\n");
 	} else {
-		igt_debug("Odd width NV12 framebuffer test skipped\n");
+		igt_verbose("Odd width NV12 framebuffer test skipped\n");
 	}
 
 	/* test against intel_plane_check_src_coordinates() in i915 */
@@ -1314,7 +1314,7 @@ static void test_planar_settings(data_t *data)
 		igt_remove_fb(data->drm_fd, &fb);
 		igt_assert_f(rval == expected_rval, "Odd height NV12 framebuffer\n");
 	} else {
-		igt_debug("Odd height NV12 framebuffer test skipped\n");
+		igt_verbose("Odd height NV12 framebuffer test skipped\n");
 	}
 }
 
