@@ -435,12 +435,54 @@ static bool can_remap(data_t *data, uint64_t modifier)
 	return true;
 }
 
+static void intel_max_hw_stride(int32_t devid, uint64_t modifier,
+				int *pixels, int *bytes)
+
+{
+	/* should be kept in sync with the kernel imposed limits */
+	if (intel_display_ver(devid) >= 13) {
+		*pixels = 65536;
+		*bytes = 128 * 1024;
+	} else if (intel_display_ver(devid) == 12) {
+		*pixels = 8192;
+		*bytes = 64 * 1024;
+	} else if (intel_display_ver(devid) == 11) {
+		*pixels = 8192;
+		*bytes = 64 * 1024;
+		if (modifier == DRM_FORMAT_MOD_LINEAR)
+			*bytes -= 64;
+	} else if (intel_display_ver(devid) >= 9 ||
+		   IS_BROADWELL(devid) || IS_HASWELL(devid)) {
+		*pixels = 8192;
+		*bytes = 32 * 1024;
+	} else if (intel_display_ver(devid) >= 4) {
+		if (modifier == I915_FORMAT_MOD_X_TILED)
+			*pixels = 4096;
+		else
+			*pixels = INT_MAX;
+		*bytes = 32 * 1024;
+	} else if (intel_display_ver(devid) == 3) {
+		*pixels = INT_MAX;
+		if (modifier == I915_FORMAT_MOD_X_TILED)
+			*bytes = 8 * 1024;
+		else
+			*bytes = 16 * 1024;
+	} else if (intel_display_ver(devid) == 2) {
+		*pixels = INT_MAX;
+		*bytes = 8 * 1024;
+	}
+}
+
 static void max_fb_size(data_t *data, int *width, int *height,
 			uint32_t format, uint64_t modifier,
 			igt_rotation_t rotation)
 {
 	int max_width, max_height;
 	struct igt_fb fb;
+
+	intel_max_hw_stride(data->devid, data->modifier,
+			    &data->max_hw_stride_pixels,
+			    &data->max_hw_stride_bytes);
 
 	if (0 && intel_display_ver(data->devid) < 13 && igt_fb_is_ccs_modifier(modifier)) {
 		/* FIXME figure out what's correct */
@@ -1035,44 +1077,6 @@ test_addfb(data_t *data)
 	gem_close(data->drm_fd, bo);
 }
 
-static void intel_max_hw_stride(uint32_t devid,
-				uint64_t modifier,
-				int *pixels, int *bytes)
-{
-	/* should be kept in sync with the kernel imposed limits */
-	if (intel_display_ver(devid) >= 13) {
-		*pixels = 65536;
-		*bytes = 128 * 1024;
-	} else if (intel_display_ver(devid) == 12) {
-		*pixels = 8192;
-		*bytes = 64 * 1024;
-	} else if (intel_display_ver(devid) == 11) {
-		*pixels = 8192;
-		*bytes = 64 * 1024;
-		if (modifier == DRM_FORMAT_MOD_LINEAR)
-			*bytes -= 64;
-	} else if (intel_display_ver(devid) >= 9 ||
-		   IS_BROADWELL(devid) || IS_HASWELL(devid)) {
-		*pixels = 8192;
-		*bytes = 32 * 1024;
-	} else if (intel_display_ver(devid) >= 4) {
-		if (modifier == I915_FORMAT_MOD_X_TILED)
-			*pixels = 4096;
-		else
-			*pixels = INT_MAX;
-		*bytes = 32 * 1024;
-	} else if (intel_display_ver(devid) == 3) {
-		*pixels = INT_MAX;
-		if (modifier == I915_FORMAT_MOD_X_TILED)
-			*bytes = 8 * 1024;
-		else
-			*bytes = 16 * 1024;
-	} else if (intel_display_ver(devid) == 2) {
-		*pixels = INT_MAX;
-		*bytes = 8 * 1024;
-	}
-}
-
 static void test_cleanup(data_t *data)
 {
 	if (!data->output)
@@ -1220,9 +1224,6 @@ igt_main
 		igt_subtest_f("%s-addfb-size-overflow",
 			      modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
-			intel_max_hw_stride(data.devid, data.modifier,
-					    &data.max_hw_stride_pixels,
-					    &data.max_hw_stride_bytes);
 			test_size_overflow(&data);
 		}
 	}
@@ -1232,9 +1233,6 @@ igt_main
 		igt_subtest_f("%s-addfb-size-offset-overflow",
 			      modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
-			intel_max_hw_stride(data.devid, data.modifier,
-					    &data.max_hw_stride_pixels,
-					    &data.max_hw_stride_bytes);
 			test_size_offset_overflow(&data);
 		}
 	}
@@ -1243,19 +1241,12 @@ igt_main
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		igt_subtest_f("%s-addfb", modifiers[i].name) {
 			data.modifier = modifiers[i].modifier;
-			intel_max_hw_stride(data.devid, data.modifier,
-					    &data.max_hw_stride_pixels,
-					    &data.max_hw_stride_bytes);
 			test_addfb(&data);
 		}
 	}
 
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		data.modifier = modifiers[i].modifier;
-		
-		intel_max_hw_stride(data.devid, data.modifier,
-				    &data.max_hw_stride_pixels,
-				    &data.max_hw_stride_bytes);
 
 		for (int j = 0; j < ARRAY_SIZE(formats); j++) {
 			data.format = formats[j].format;
@@ -1294,10 +1285,6 @@ igt_main
 	data.max_hw_stride_test = true;
 	for (int i = 0; i < ARRAY_SIZE(modifiers); i++) {
 		data.modifier = modifiers[i].modifier;
-
-		intel_max_hw_stride(data.devid, data.modifier,
-				    &data.max_hw_stride_pixels,
-				    &data.max_hw_stride_bytes);
 
 		for (int j = 0; j < ARRAY_SIZE(formats); j++) {
 			data.format = formats[j].format;
