@@ -1101,6 +1101,9 @@ static bool has_async_flip(data_t *data)
 	    igt_fb_is_ccs_modifier(data->modifier))
 		return false;
 
+	if (igt_fb_is_gen12_rc_ccs_cc_modifier(data->modifier))
+		return false;
+
 	if (igt_format_is_yuv_semiplanar(data->format))
 		return false;
 
