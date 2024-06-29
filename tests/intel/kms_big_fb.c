@@ -1097,7 +1097,8 @@ static bool has_async_flip(data_t *data)
 	 * TODO: preferably probe all this stuff with
 	 * TEST_ONLY rather than hardcoding it...
 	 */
-	if (igt_fb_is_ccs_modifier(data->modifier))
+	if (intel_display_ver(data->devid) < 11 &&
+	    igt_fb_is_ccs_modifier(data->modifier))
 		return false;
 
 	if (igt_format_is_yuv_semiplanar(data->format))
