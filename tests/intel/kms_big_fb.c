@@ -391,6 +391,13 @@ static bool uses_ggtt(data_t *data)
 static bool uses_mappable(data_t *data)
 {
 	/*
+	 * FIXME small BAR causes problems.
+	 * Should avoid direct LMEM access...
+	 */
+	if (IS_DG2(data->devid))
+		return true;
+
+	/*
 	 * The kernel limits scanout to the
 	 * mappable portion of ggtt on gmch platforms.
 	 */
