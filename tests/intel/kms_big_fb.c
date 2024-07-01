@@ -560,12 +560,24 @@ static void max_fb_size(data_t *data, int *width, int *height,
 		 *width, *height, max_width, max_height);
 }
 
+static void remove_incompatible_fb(data_t *data, struct igt_fb *fb,
+				   int width, int height)
+{
+	if (!fb->fb_id)
+		return;
+
+	if (fb->drm_format == data->format &&
+	    fb->modifier == data->modifier &&
+	    fb->width == width &&
+	    fb->height == height)
+		return;
+
+       igt_remove_fb(data->drm_fd, fb);
+}
+
 static void prep_small_fb(data_t *data, int width, int height)
 {
-	if (data->small_fb.fb_id &&
-	    (data->small_fb.width != width ||
-	     data->small_fb.height != height))
-		igt_remove_fb(data->drm_fd, &data->small_fb);
+	remove_incompatible_fb(data, &data->small_fb, width, height);
 
 	if (!data->small_fb.fb_id)
 		igt_create_fb(data->drm_fd, width, height,
@@ -602,12 +614,10 @@ static void create_big_fb(data_t *data, struct igt_fb *fb)
 
 static void prep_big_fb(data_t *data)
 {
-	if (data->big_fb.fb_id &&
-	    (data->big_fb.width != data->big_fb_width ||
-	     data->big_fb.height != data->big_fb_height)) {
-		igt_remove_fb(data->drm_fd, &data->big_fb_solid);
-		igt_remove_fb(data->drm_fd, &data->big_fb);
-	}
+	remove_incompatible_fb(data, &data->big_fb,
+			       data->big_fb_width, data->big_fb_height);
+	remove_incompatible_fb(data, &data->big_fb_solid,
+			       data->big_fb_width, data->big_fb_height);
 
 	if (!data->big_fb.fb_id) {
 		create_big_fb(data, &data->big_fb);
