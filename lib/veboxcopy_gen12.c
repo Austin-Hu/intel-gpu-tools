@@ -29,6 +29,7 @@
 #define YCRCB_NORMAL	0
 #define PLANAR_420_8	4
 #define PACKED_444A_8	5
+#define R10G10B10A2_UNORM	7
 #define R8G8B8A8_UNORM	8
 #define PACKED_444_16	9
 #define PLANAR_420_16	12
@@ -168,6 +169,8 @@ static uint32_t compression_format(int format, struct intel_buf *buf)
 	switch (format) {
 	case R16G16B16A16:
 		return 0x1;
+	case R10G10B10A2_UNORM:
+		return 0xe;
 	case R8G8B8A8_UNORM:
 		return 0xa;
 	case PLANAR_420_8:
@@ -344,7 +347,8 @@ void gen12_vebox_copyfunc(struct intel_bb *ibb,
 	case 32:
 		igt_assert(!src->format_is_yuv_semiplanar);
 		format = src->format_is_yuv ? PACKED_444A_8 :
-					      R8G8B8A8_UNORM;
+			 src->depth == 30 ? R10G10B10A2_UNORM :
+					    R8G8B8A8_UNORM;
 		break;
 	case 64:
 		igt_assert(!src->format_is_yuv_semiplanar);
