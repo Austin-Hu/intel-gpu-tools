@@ -450,10 +450,10 @@ static void intel_max_hw_stride(int32_t devid, uint64_t modifier,
 	if (intel_display_ver(devid) >= 13) {
 		*pixels = 65536;
 		*bytes = 128 * 1024;
-	} else if (intel_display_ver(devid) == 12) {
+	} else if (0 && intel_display_ver(devid) == 12) {
 		*pixels = 8192;
 		*bytes = 64 * 1024;
-	} else if (intel_display_ver(devid) == 11) {
+	} else if (0 && intel_display_ver(devid) == 11) {
 		*pixels = 8192;
 		*bytes = 64 * 1024;
 		if (modifier == DRM_FORMAT_MOD_LINEAR)
