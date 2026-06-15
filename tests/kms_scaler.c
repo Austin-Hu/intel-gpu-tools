@@ -51,21 +51,32 @@ static void test(data_t *data)
 
 	plane = igt_output_get_plane_type(data->output,
 					    DRM_PLANE_TYPE_PRIMARY);
+	igt_plane_set_size(plane, dw, dh);
+
 	igt_plane_set_fb(plane, &fb);
 
 	igt_fb_set_size(&fb, plane, sw, sh);
+
+	// Prepare the CRTC (DPMS on it) before testing.
+	igt_display_commit_atomic(&data->display, DRM_MODE_ATOMIC_ALLOW_MODESET,
+			NULL);
 
 	while (dw >= 8 && dh >= 8) {
 		float hscale = (float)sw/dw;
 		float vscale = (float)sh/dh;
 
-		igt_info("scale %f %f (rate %d)\n", hscale, vscale,
-			 (int)(mode->clock * hscale * vscale / 2.0f));
-
 		igt_plane_set_size(plane, dw, dh);
 
 		igt_reset_fifo_underrun_reporting(data->drm_fd);
-		igt_display_commit_atomic(&data->display, flags, NULL);
+		if (!igt_display_try_commit_atomic(&data->display,
+					DRM_MODE_ATOMIC_TEST_ONLY, NULL)) {
+			igt_display_commit_atomic(&data->display, flags, NULL);
+
+			igt_info("scale %f %f (rate %d)\n", hscale, vscale,
+					(int)(mode->clock * hscale * vscale / 2.0f));
+		} else
+			igt_warn("scale %f %f (rate %d) atomic TEST failed.\n", hscale,
+					vscale, (int)(mode->clock * hscale * vscale / 2.0f));
 
 		dw -= 4;
 		//dh -= 1;
