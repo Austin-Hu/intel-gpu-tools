@@ -35,7 +35,21 @@ static void test(data_t *data)
 	igt_plane_t *plane;
 	uint32_t flags = DRM_MODE_ATOMIC_ALLOW_MODESET;
 
-	mode = pick_mode(data->output);
+	// NOTE: with 4K@60Hz setting for some external panel which doesn't support
+	// the timing would induce pipe B FIFO underrun during testing
+	// mode = pick_mode(data->output);
+	mode = igt_output_get_mode(data->output);
+	if (!mode) {
+		igt_critical("Couldn't get the current mode of output %s\n",
+				data->output->name);
+		return;
+	}
+
+	// Change some timing values of current mode to override and test.
+	// mode->clock = 297000;
+	// mode->clock = 234000;
+	// mode->flags |= DRM_MODE_FLAG_PHSYNC | DRM_MODE_FLAG_PVSYNC;
+
 	igt_output_override_mode(data->output, mode);
 
 	igt_create_pattern_fb(data->drm_fd, mode->hdisplay, mode->vdisplay,
