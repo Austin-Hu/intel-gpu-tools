@@ -59,13 +59,18 @@ static void test(data_t *data)
 		float hscale = (float)sw/dw;
 		float vscale = (float)sh/dh;
 
-		igt_info("scale %f %f (rate %d)\n", hscale, vscale,
-			 (int)(mode->clock * hscale * vscale / 2.0f));
-
 		igt_plane_set_size(plane, dw, dh);
 
 		igt_reset_fifo_underrun_reporting(data->drm_fd);
-		igt_display_commit_atomic(&data->display, flags, NULL);
+		if (!igt_display_try_commit_atomic(&data->display,
+					flags | DRM_MODE_ATOMIC_TEST_ONLY, NULL)) {
+			igt_display_commit_atomic(&data->display, flags, NULL);
+
+			igt_info("scale %f %f (rate %d)\n", hscale, vscale,
+					(int)(mode->clock * hscale * vscale / 2.0f));
+		} else
+			igt_info("scale %f %f (rate %d) atomic test failed.\n", hscale,
+					vscale, (int)(mode->clock * hscale * vscale / 2.0f));
 
 		dw -= 4;
 		//dh -= 1;
